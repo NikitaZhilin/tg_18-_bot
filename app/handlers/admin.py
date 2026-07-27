@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -14,6 +13,7 @@ from app.config import Config
 from app.handlers.common import reject_callback_if_not_admin, reject_if_not_allowed
 from app.keyboards.admin import admin_menu, card_manage, category_choice, import_confirm_choice, intensity_choice, level_choice, save_choice
 from app.services.admin_service import AdminService
+from app.services.export_service import save_cards_xlsx
 
 router = Router(name="admin")
 
@@ -393,13 +393,13 @@ async def cb_admin_export(callback: CallbackQuery, config: Config, admin_service
     if await reject_callback_if_not_admin(callback, config):
         return
     rows = admin_service.export_rows()
-    with NamedTemporaryFile("w", delete=False, suffix=".csv", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["id", "external_id", "level", "category", "intensity", "review_status", "is_enabled", "text"])
-        for row in rows:
-            writer.writerow([row["id"], row["external_id"], row["level"], row["category"], row["intensity"], row["review_status"], row["is_enabled"], row["text"]])
+    with NamedTemporaryFile(delete=False, suffix=".xlsx") as fh:
         export_path = fh.name
-    await callback.message.answer_document(FSInputFile(export_path), caption="Экспорт карточек")
+    save_cards_xlsx(rows, export_path)
+    await callback.message.answer_document(
+        FSInputFile(export_path, filename="cards_export.xlsx"),
+        caption="Экспорт карточек (.xlsx)",
+    )
     await callback.answer()
 
 

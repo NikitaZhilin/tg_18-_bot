@@ -104,9 +104,42 @@ class AdminService:
     def export_rows(self):
         return self.db.fetchall(
             """
-            SELECT id, external_id, level, category, intensity, review_status, is_enabled, text
-            FROM cards
-            ORDER BY id
+            SELECT
+                c.id,
+                c.external_id,
+                c.level,
+                c.category,
+                c.intensity,
+                c.title,
+                c.text,
+                (
+                    SELECT group_concat(cri.item_code, ',')
+                    FROM card_required_items cri
+                    WHERE cri.card_id = c.id
+                ) AS required_items,
+                c.timer_seconds,
+                c.risk_tags,
+                c.avoid_if_tags,
+                (
+                    SELECT group_concat(cci.collection_code, ',')
+                    FROM card_collection_items cci
+                    WHERE cci.card_id = c.id
+                ) AS collections,
+                c.review_status,
+                c.is_enabled,
+                c.requires_both_opt_in,
+                c.requires_safeword_check,
+                c.aftercare_required,
+                c.safety_level,
+                c.pose_family,
+                c.pose_difficulty,
+                c.space_required,
+                c.body_load,
+                c.notes,
+                c.created_at,
+                c.updated_at
+            FROM cards c
+            ORDER BY c.id
             """
         )
 
