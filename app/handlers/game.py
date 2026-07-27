@@ -233,7 +233,12 @@ async def cb_reset_no(callback: CallbackQuery, config: Config) -> None:
 async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
-    enabled = game_service.set_level_4_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
+    try:
+        game_service.ensure_session(_chat_id(callback), callback_thread_id(callback), callback.message.chat.title if callback.message else None)
+        enabled = game_service.set_level_4_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
+    except GameError as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
     text = (
         "Уровень 4 включен."
         if enabled
@@ -247,7 +252,12 @@ async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameS
 async def cb_hard(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
-    enabled = game_service.set_hard_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
+    try:
+        game_service.ensure_session(_chat_id(callback), callback_thread_id(callback), callback.message.chat.title if callback.message else None)
+        enabled = game_service.set_hard_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
+    except GameError as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
     text = (
         "Hard-интенсивность включена."
         if enabled
