@@ -1,0 +1,197 @@
+external_id,level,category,intensity,title,text,required_items,timer_seconds,risk_tags,avoid_if_tags,collection,review_status,is_enabled,requires_both_opt_in,requires_safeword_check,aftercare_required,safety_level,pose_family,pose_difficulty,space_required,body_load,notes
+task_l1_001,1,task,light,Уровень 1 - 1,"Сделайте короткий ритуал внимания: один партнер выбирает темп вечера, второй повторяет его настроение жестами и словами.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_002,1,task,light,Уровень 1 - 2,"На две минуты уберите телефоны и говорите только о том, что сейчас приятно и спокойно.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_003,1,task,light,Уровень 1 - 3,"Выберите одно мягкое правило на следующий ход: медленнее, тише, ближе или больше пауз.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_004,1,task,light,Уровень 1 - 4,"Партнер задает три вопроса о желаниях на вечер, второй отвечает только в комфортных границах.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_005,1,task,light,Уровень 1 - 5,"Сделайте паузу на объятия и договоритесь, что сегодня точно не используете.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_006,1,task,light,Уровень 1 - 6,"Один партнер закрывает глаза на минуту, второй создает спокойную атмосферу голосом и прикосновениями.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_007,1,task,light,Уровень 1 - 7,Выберите одно место для мягкого массажа и держите темп спокойным до конца таймера.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_008,1,task,light,Уровень 1 - 8,"Партнер говорит три фразы, которые помогают расслабиться, затем передает ход.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_009,1,task,light,Уровень 1 - 9,Сделайте мини-сцену с запретом спешить: каждое действие начинается только после короткого взгляда.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_010,1,task,light,Уровень 1 - 10,"Выберите общий сигнал паузы, отличный от стоп-слова, и проверьте, что оба его помнят.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_011,1,task,light,Уровень 1 - 11,"Один партнер называет границу, второй повторяет ее и подтверждает уважение к ней.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_012,1,task,light,Уровень 1 - 12,Составьте маленький список из трех настроений для вечера и выберите одно.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_013,1,task,light,Уровень 1 - 13,"Сделайте пять медленных поцелуев или объятий, между ними оставляя короткую паузу.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_014,1,task,light,Уровень 1 - 14,"Партнер выбирает музыку или тишину, второй соглашается или предлагает мягкую замену.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_015,1,task,light,Уровень 1 - 15,Устройте минуту комплиментов без шуток и без давления.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_016,1,task,light,Уровень 1 - 16,"Один партнер просит разрешение на следующий нежный жест, второй отвечает да, позже или пауза.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_017,1,task,light,Уровень 1 - 17,Выберите комфортную дистанцию и постепенно сокращайте ее только по взаимному согласию.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_018,1,task,light,Уровень 1 - 18,"Проведите короткий check-in: что нравится, что пока не хочется, что можно усилить.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_019,1,task,light,Уровень 1 - 19,Партнер задает правило: говорить медленнее или двигаться медленнее до конца хода.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_020,1,task,light,Уровень 1 - 20,"Сделайте ритуал начала: вода рядом, стоп-слово подтверждено, лишние уведомления выключены.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_021,1,task,light,Уровень 1 - 21,"Один партнер выбирает свет, второй выбирает музыку или тишину.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_022,1,task,light,Уровень 1 - 22,Скажите друг другу по одному желанию в неграфичной форме.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_023,1,task,light,Уровень 1 - 23,"Сделайте двухминутный массаж плеч, рук или спины без перехода к более интенсивной сцене.",,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l1_024,1,task,light,Уровень 1 - 24,Завершите ход фразой: что было приятно и что хочется оставить на потом.,,120,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_001,2,task,light,Уровень 2 - 1,"Один партнер задает темп и паузы на три минуты, второй может остановить или замедлить в любой момент.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_002,2,task,light,Уровень 2 - 2,Используйте выбранный реквизит только как сенсорный акцент и заранее подтвердите комфорт.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_003,2,task,light,Уровень 2 - 3,"Партнер выбирает запрет на одно действие до конца таймера: не спешить, не отвлекаться или не говорить лишнего.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_004,2,task,light,Уровень 2 - 4,Сделайте сцену ожидания: следующий шаг происходит только после просьбы и явного разрешения.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_005,2,task,light,Уровень 2 - 5,"Один партнер ведет короткую разминку голосом, второй отвечает только простыми сигналами комфорта.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_006,2,task,light,Уровень 2 - 6,Выберите безопасное место и смените позу или дистанцию без резких движений.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_007,2,task,light,Уровень 2 - 7,"Партнер задает три мягкие команды, каждая команда может быть заменена словом пауза.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_008,2,task,light,Уровень 2 - 8,Сделайте сенсорный контраст с повязкой только если она есть в выбранном реквизите.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_009,2,task,light,Уровень 2 - 9,"Один партнер выбирает таймер, второй выбирает интенсивность в пределах light или medium.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_010,2,task,light,Уровень 2 - 10,В течение хода используйте правило: любое продолжение начинается с вопроса можно.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_011,2,task,light,Уровень 2 - 11,Партнер получает право один раз поставить паузу на 30 секунд без объяснений.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_012,2,task,light,Уровень 2 - 12,"Сделайте короткую сцену с маслом или массажем, если этот реквизит выбран.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_013,2,task,light,Уровень 2 - 13,"Один партнер сохраняет инициативу, второй выбирает одно ограничение для комфорта.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_014,2,task,light,Уровень 2 - 14,Проговорите три стоп-темы на сегодня и занесите их в настройки границ.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_015,2,task,light,Уровень 2 - 15,Используйте правило медленного ответа: перед каждым согласием или отказом выдерживается короткая пауза.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_016,2,task,light,Уровень 2 - 16,"Партнер выбирает один безопасный сенсорный элемент: тепло, прохлада, ткань или музыка.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_017,2,task,light,Уровень 2 - 17,"Сделайте мини-сцену на доверие: один направляет, второй регулярно подтверждает комфорт.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_018,2,task,light,Уровень 2 - 18,Один партнер просит выбрать между двумя мягкими вариантами продолжения.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_019,2,task,light,Уровень 2 - 19,"Поменяйте роли ведущего и ведомого на две минуты, не повышая интенсивность.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_020,2,task,light,Уровень 2 - 20,"Сделайте карточку без слов: только заранее согласованные жесты да, медленнее и стоп.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_021,2,task,light,Уровень 2 - 21,Партнер задает ритм дыхательных пауз без ограничений воздуха и без давления на тело.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_022,2,task,light,Уровень 2 - 22,Сделайте сцену на внимание к реакции партнера: ведущий обязан спросить комфорт минимум два раза.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_023,2,task,light,Уровень 2 - 23,"Один партнер выбирает награду после хода: вода, объятие, пауза или комплимент.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l2_024,2,task,light,Уровень 2 - 24,"Завершите ход коротким обсуждением: оставить, усилить, убрать.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_001,3,task,light,Уровень 3 light - 1,"Партнер задает мягкий темп на три минуты, второй может изменить его одним словом.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_002,3,task,light,Уровень 3 light - 2,"Сделайте сцену с двумя паузами, каждая пауза начинается по команде ведущего.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_003,3,task,light,Уровень 3 light - 3,Выберите одну простую позу и удерживайте спокойный ритм до конца таймера.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_004,3,task,light,Уровень 3 light - 4,Один партнер направляет положение рук без фиксации и без давления на суставы.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_005,3,task,light,Уровень 3 light - 5,Смена роли: ведущий становится принимающим после первого check-in.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_006,3,task,light,Уровень 3 light - 6,"Партнер выбирает правило тишины на одну минуту, сигналы комфорта остаются активными.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_007,3,task,light,Уровень 3 light - 7,Сделайте сенсорный акцент с выбранным реквизитом и заранее обозначьте границы.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_008,3,task,light,Уровень 3 light - 8,"Ведущий может дважды сказать пауза, второй сохраняет выбранный темп.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_009,3,task,light,Уровень 3 light - 9,Партнер выбирает между близкой позой и массажной паузой.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_010,3,task,light,Уровень 3 light - 10,Сцена строится вокруг медленного разрешения на каждый следующий шаг.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_011,3,task,light,Уровень 3 light - 11,"Один партнер задает ритм словами быстрее, медленнее или замри.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_012,3,task,light,Уровень 3 light - 12,"Проведите короткую смену пространства: кровать, стул или пол только если удобно.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_013,3,task,light,Уровень 3 light - 13,"Сделайте три этапа: настройка, действие, check-in.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_014,3,task,light,Уровень 3 light - 14,"Ведущий выбирает музыку или тишину, второй выбирает таймер.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_015,3,task,light,Уровень 3 light - 15,Партнер удерживает выбранное правило до окончания хода.,,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_light_016,3,task,light,Уровень 3 light - 16,"Завершите сцену фразой о том, что стоит повторить.",,180,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+task_l3_medium_001,3,task,medium,Уровень 3 medium - 1,"Ведущий задает строгие паузы по таймеру, ведомый может остановить сцену в любой момент.",,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_002,3,task,medium,Уровень 3 medium - 2,Один партнер временно отказывается от инициативы и выполняет только согласованные команды.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_003,3,task,medium,Уровень 3 medium - 3,Сделайте сцену с запретом спешки: любое ускорение требует разрешения.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_004,3,task,medium,Уровень 3 medium - 4,Партнер выбирает безопасное ограничение движения без связывания и без давления на суставы.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_005,3,task,medium,Уровень 3 medium - 5,Ведущий назначает три правила на пять минут и проверяет комфорт в середине.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_006,3,task,medium,Уровень 3 medium - 6,Используйте повязку только при выбранном реквизите и коротком таймере.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_007,3,task,medium,Уровень 3 medium - 7,Сцена строится на ожидании: продолжение возможно только после разрешения.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_008,3,task,medium,Уровень 3 medium - 8,"Один партнер задает чередование темпа: медленно, пауза, снова медленно.",,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_009,3,task,medium,Уровень 3 medium - 9,Партнер получает право один раз изменить правило без объяснения.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_010,3,task,medium,Уровень 3 medium - 10,Сделайте короткую роль с ясным окончанием и нейтральным выходом.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_011,3,task,medium,Уровень 3 medium - 11,"Ведущий контролирует слова: ведомый отвечает только да, медленнее, пауза или стоп.",,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_012,3,task,medium,Уровень 3 medium - 12,Смена позы происходит только после check-in.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_013,3,task,medium,Уровень 3 medium - 13,"Один партнер выбирает реквизит, второй выбирает, как долго он используется.",,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_014,3,task,medium,Уровень 3 medium - 14,Сделайте сцену на выдержку без боли и без небезопасной фиксации.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_015,3,task,medium,Уровень 3 medium - 15,Ведущий задает последовательность из трех безопасных действий.,,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_medium_016,3,task,medium,Уровень 3 medium - 16,"После таймера оба называют одну границу, которую бот должен учитывать дальше.",,180,,,base_tasks,approved,1,0,0,0,sensitive,,,,,generated seed
+task_l3_hard_001,3,task,hard,Уровень 3 hard - 1,Строгая сцена контроля темпа на короткий таймер с обязательным stop-check перед началом.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_002,3,task,hard,Уровень 3 hard - 2,Один партнер полностью передает инициативу в заранее выбранных границах до окончания таймера.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_003,3,task,hard,Уровень 3 hard - 3,Ведущий задает протокол разрешений: продолжение только после явного ответа.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_004,3,task,hard,Уровень 3 hard - 4,"Сцена трех правил: тишина, пауза и ожидание, любое правило отменяется стоп-словом.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_005,3,task,hard,Уровень 3 hard - 5,Ведомый сохраняет выбранную позу или паузу без физической фиксации.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_006,3,task,hard,Уровень 3 hard - 6,Ведущий может менять темп только внутри заранее согласованного диапазона.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_007,3,task,hard,Уровень 3 hard - 7,Сделайте ролевую сцену с коротким check-in в середине и aftercare в конце.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_008,3,task,hard,Уровень 3 hard - 8,"Один партнер получает право управлять очередностью действий, второй сохраняет право паузы.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_009,3,task,hard,Уровень 3 hard - 9,Сцена запрета инициативы: ведомый не предлагает следующий шаг до разрешения.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_010,3,task,hard,Уровень 3 hard - 10,Ведущий задает команды только из заранее утвержденного списка.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_011,3,task,hard,Уровень 3 hard - 11,Партнер выдерживает короткое ожидание перед каждым разрешением.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_012,3,task,hard,Уровень 3 hard - 12,"Сцена строится на психологическом напряжении, без боли, травм и дыхательных ограничений.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_013,3,task,hard,Уровень 3 hard - 13,Ведущий дважды проверяет состояние и завершает сцену нейтральной фразой.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_014,3,task,hard,Уровень 3 hard - 14,"Один партнер выбирает строгую роль, второй выбирает границу, которую нельзя пересекать.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_015,3,task,hard,Уровень 3 hard - 15,Сцена ограниченного выбора: доступны только два заранее безопасных варианта.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l3_hard_016,3,task,hard,Уровень 3 hard - 16,"После сцены обязательны вода, пауза и вопрос что было хорошо.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_001,4,task,light,Уровень 4 light - 1,Символическая сцена подчинения с коротким протоколом входа и выхода.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_002,4,task,light,Уровень 4 light - 2,"Ведомый просит разрешение на каждый следующий шаг, отказ принимается сразу.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_003,4,task,light,Уровень 4 light - 3,Сенсорная сцена с повязкой и заранее выбранными безопасными прикосновениями.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_004,4,task,light,Уровень 4 light - 4,Ведущий задает правило обращения на время таймера.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_005,4,task,light,Уровень 4 light - 5,Сцена служения: один партнер выполняет заранее выбранную мягкую просьбу.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_006,4,task,light,Уровень 4 light - 6,Протокол паузы: каждая смена действия начинается с вопроса о комфорте.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_007,4,task,light,Уровень 4 light - 7,Один партнер выбирает три разрешенных команды и одну запрещенную тему.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_008,4,task,light,Уровень 4 light - 8,"Сделайте ритуал начала: границы, стоп-слово, таймер, вода.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_009,4,task,light,Уровень 4 light - 9,"Ведущий управляет только темпом и словами, без физического давления.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_010,4,task,light,Уровень 4 light - 10,Ведомый выбирает безопасный жест для просьбы о замедлении.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_011,4,task,light,Уровень 4 light - 11,Сцена с правилами взгляда и пауз без ограничения движения.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_012,4,task,light,Уровень 4 light - 12,Один партнер получает право завершить сцену в любой момент без объяснений.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_013,4,task,light,Уровень 4 light - 13,Ведущий задает короткий сценарий ожидания и завершает его check-in.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_014,4,task,light,Уровень 4 light - 14,Сделайте сцену с одним реквизитом только если он выбран в настройках.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_015,4,task,light,Уровень 4 light - 15,Ведомый выбирает aftercare до начала сцены.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_light_016,4,task,light,Уровень 4 light - 16,Завершите сцену формальным выходом из роли.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_001,4,task,medium,Уровень 4 medium - 1,Более строгий протокол разрешений на пять минут с check-in в середине.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_002,4,task,medium,Уровень 4 medium - 2,"Ведущий задает последовательность из трех правил, каждое можно отменить паузой.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_003,4,task,medium,Уровень 4 medium - 3,Сцена контролируемого ожидания без боли и без опасной фиксации.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_004,4,task,medium,Уровень 4 medium - 4,Ведомый отвечает только заранее согласованными словами.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_005,4,task,medium,Уровень 4 medium - 5,"Один партнер выполняет роль ведущего до таймера, второй контролирует границы.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_006,4,task,medium,Уровень 4 medium - 6,Сенсорное ограничение используется только коротко и только с активным стоп-словом.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_007,4,task,medium,Уровень 4 medium - 7,"Ведущий выбирает смену темпа, ведомый выбирает максимальную длительность.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_008,4,task,medium,Уровень 4 medium - 8,"Сцена служения с ясным началом, концом и aftercare.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_009,4,task,medium,Уровень 4 medium - 9,Партнеры заранее выбирают запрещенные темы и бот исключает их из выдачи.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_010,4,task,medium,Уровень 4 medium - 10,Ведущий может дать одну команду замри без физической фиксации.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_011,4,task,medium,Уровень 4 medium - 11,Сцена на выдержку строится вокруг ожидания разрешения.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_012,4,task,medium,Уровень 4 medium - 12,Ведомый может один раз заменить команду без объяснений.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_013,4,task,medium,Уровень 4 medium - 13,"Ведущий поддерживает строгий тон, но без унижения вне согласованных слов.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_014,4,task,medium,Уровень 4 medium - 14,Сцена заканчивается обязательным вопросом о состоянии.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_015,4,task,medium,Уровень 4 medium - 15,Один партнер выбирает правило молчания на короткий таймер с жестами безопасности.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_medium_016,4,task,medium,Уровень 4 medium - 16,"После сцены оба отмечают, что убрать из будущих карточек.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_001,4,task,hard,Уровень 4 hard - 1,"Строгая ролевая сцена с заранее выбранными правилами, safeword-check и aftercare.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_002,4,task,hard,Уровень 4 hard - 2,"Ведущий контролирует инициативу до таймера, ведомый сохраняет право мгновенной паузы.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_003,4,task,hard,Уровень 4 hard - 3,Сцена с запретом самостоятельных решений внутри согласованных границ.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_004,4,task,hard,Уровень 4 hard - 4,"Протокол трех команд, где каждая команда заранее утверждена обоими.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_005,4,task,hard,Уровень 4 hard - 5,Ведомый выдерживает ожидание разрешения без боли и без дыхательных ограничений.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_006,4,task,hard,Уровень 4 hard - 6,Ведущий задает жесткий ритм пауз и выхода из роли.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_007,4,task,hard,Уровень 4 hard - 7,Сцена полного контроля темпа без физически опасных действий.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_008,4,task,hard,Уровень 4 hard - 8,"Один партнер выбирает строгую роль, второй выбирает aftercare и стоп-темы.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_009,4,task,hard,Уровень 4 hard - 9,Сцена на психологическое напряжение только с коротким таймером.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_010,4,task,hard,Уровень 4 hard - 10,Ведущий может прервать действие и вернуть партнера к паузе.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_011,4,task,hard,Уровень 4 hard - 11,Ведомый сохраняет выбранное правило до конца сцены или стоп-слова.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_012,4,task,hard,Уровень 4 hard - 12,Сцена с ограниченным набором фраз и обязательной проверкой состояния.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_013,4,task,hard,Уровень 4 hard - 13,Партнеры используют правило немедленного выхода из роли после стоп-слова.,,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_014,4,task,hard,Уровень 4 hard - 14,"Ведущий задает порядок действий, но не добавляет новые практики по ходу.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_015,4,task,hard,Уровень 4 hard - 15,"Сцена заканчивается водой, теплом и коротким обсуждением.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+task_l4_hard_016,4,task,hard,Уровень 4 hard - 16,"После сцены бот предлагает отметить карточку как оставить, изменить или отключить.",,180,,,base_tasks,needs_review,0,1,1,1,hard,,,,,generated seed
+pose_ks_001,2,pose,light,Лотос,"Сидячая близкая поза с акцентом на объятия, взгляд и медленный темп.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,seated,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_002,2,pose,light,Ложки,Боковая расслабленная поза для мягкого контакта и длительного ритма без высокой нагрузки.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,side,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_003,2,pose,light,Колыбель,"Один партнер лежит удобно, второй задает мягкий темп и поддерживает контакт руками.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,reclined,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_004,2,pose,light,Лицом к лицу,"Близкая поза с фокусом на поцелуи, ритм и синхронность.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,face_to_face,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_005,3,pose,light,Наездница,"Верхний партнер задает темп, нижний остается в принимающей и поддерживающей роли.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,top,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_006,3,pose,light,Обратная наездница,Вариант с другой ориентацией корпуса и большей свободой движения верхнего партнера.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,top,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_007,3,pose,light,Край кровати,"Поза у края кровати, где важно заранее проверить устойчивость и удобную высоту.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,edge,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_008,3,pose,light,Стул,Сидячая поза на устойчивом стуле с фокусом на близость и контроль темпа.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,chair,medium,chair,medium,kamasutra inspired non-graphic seed
+pose_ks_009,3,pose,medium,Опора на стену,"Вертикальная поза у стены, требующая силы, устойчивости и короткой длительности.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,standing,hard,wall,high,kamasutra inspired non-graphic seed
+pose_ks_010,3,pose,medium,Подушка под таз,Вариант с валиком или подушкой для изменения угла и снижения нагрузки.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,support,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_011,3,pose,medium,Медленный контроль,"Один партнер задает правило пауз и темпа, второй заранее подтверждает комфорт.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,control,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_012,3,pose,medium,Руки над головой,Поза с символическим удержанием рук без жесткой фиксации и без давления на суставы.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,hands,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_013,3,pose,medium,На боку лицом друг к другу,"Боковая поза с тесным контактом, удобная для долгого спокойного ритма.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,side,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_014,3,pose,medium,Смена темпа,Карточка задает чередование медленных и коротких интенсивных отрезков по таймеру.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,tempo,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_015,3,pose,hard,Строгий темп,Один партнер полностью управляет скоростью и паузами в пределах заранее согласованных границ.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,control,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_016,3,pose,hard,Запрет на движение,Принимающий партнер сохраняет неподвижность до окончания короткого таймера или стоп-слова.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,stillness,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_017,3,pose,hard,Без рук,"Один партнер держит руки за спиной или на выбранном месте, не используя их до завершения сцены.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,hands,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_018,3,pose,hard,Команды и паузы,"Партнер выполняет только короткие заранее согласованные команды, после сцены обязателен check-in.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,control,hard,any,medium,kamasutra inspired non-graphic seed
+pose_ks_019,4,pose,light,Ритуал разрешения,Перед продолжением партнер просит разрешение на следующий шаг; отказ или пауза принимаются сразу.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,protocol,medium,any,low,kamasutra inspired non-graphic seed
+pose_ks_020,4,pose,light,Сенсорная повязка,"Неграфичная сенсорная сцена с повязкой, заранее выбранными прикосновениями и таймером.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,sensory,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_021,4,pose,medium,Протокол тишины,На короткое время один партнер отвечает только жестами или заранее согласованными словами.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,protocol,medium,any,low,kamasutra inspired non-graphic seed
+pose_ks_022,4,pose,medium,Роль и правила,"Сцена строится вокруг трех заранее выбранных правил, которые можно остановить в любой момент.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,role,medium,any,low,kamasutra inspired non-graphic seed
+pose_ks_023,4,pose,hard,Строгая сцена контроля,"Доминант задает последовательность пауз и разрешений, обязательны safeword-check и aftercare.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,control,hard,any,medium,kamasutra inspired non-graphic seed
+pose_ks_024,4,pose,hard,Испытание выдержки,"Короткая сцена на выдержку и ожидание без боли, травм и дыхательных ограничений.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,endurance,hard,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_025,2,pose,light,Бабочка,"Вариант у края кровати с мягкой опорой и акцентом на устойчивость, подушку и комфортный угол.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,edge,medium,bed,low,kamasutra inspired non-graphic seed
+pose_ks_026,2,pose,light,Половина лотоса,Упрощенная сидячая поза для долгого контакта без высокой нагрузки на спину и бедра.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,seated,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_027,3,pose,light,Переплетенные ноги,"Поза с близким контактом ног, где важны плавность, устойчивость и отсутствие давления на суставы.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,side,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_028,3,pose,light,Поворот на бок,Спокойный боковой вариант для смены угла и темпа без резких движений.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,normal,side,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_029,3,pose,medium,На коленях с опорой,"Поза с опорой руками или подушкой, рассчитанная на короткий таймер и контроль нагрузки.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,support,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_030,3,pose,medium,Ножницы,"Положение с боковым разворотом партнеров, где заранее проверяется комфорт бедер и поясницы.",,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,side,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_031,3,pose,medium,Высокая подушка,Поза с дополнительной подушкой для изменения угла и снижения напряжения в пояснице.,,180,,,kamasutra_inspired_poses,approved,1,0,0,0,sensitive,support,easy,bed,low,kamasutra inspired non-graphic seed
+pose_ks_032,3,pose,hard,Медленная смена поз,За один короткий таймер партнеры меняют две заранее выбранные позы только по команде ведущего.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,tempo,medium,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_033,4,pose,light,Команды взгляда,"Ведущий задает правила взгляда, пауз и разрешений без физического ограничения движений.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,protocol,easy,any,low,kamasutra inspired non-graphic seed
+pose_ks_034,4,pose,medium,Ожидание разрешения,"Сцена строится вокруг ожидания следующего разрешения, с ясной границей и коротким check-in.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,protocol,medium,bed,low,kamasutra inspired non-graphic seed
+pose_ks_035,4,pose,hard,Контроль инициативы,"Один партнер полностью отдает инициативу в рамках заранее выбранных правил, после сцены обязателен aftercare.",,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,control,hard,bed,medium,kamasutra inspired non-graphic seed
+pose_ks_036,4,pose,hard,Сцена трех правил,Перед стартом выбираются три правила сцены; любое правило отменяется стоп-словом или просьбой о паузе.,,180,,,kamasutra_inspired_poses,needs_review,0,1,1,1,hard,role,hard,any,medium,kamasutra inspired non-graphic seed
+question_seed_001,1,question,light,Вопрос 1,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 1.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_002,1,question,light,Вопрос 2,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 2.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_003,1,question,light,Вопрос 3,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 3.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_004,1,question,light,Вопрос 4,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 4.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_005,2,question,light,Вопрос 5,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 5.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_006,2,question,light,Вопрос 6,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 6.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_007,2,question,light,Вопрос 7,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 7.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+question_seed_008,2,question,light,Вопрос 8,"Ответьте по очереди на вопрос о желании, границе или настроении вечера номер 8.",,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+desire_seed_001,2,desire,light,Желание 1,Сохраните мягкое желание номер 1; использовать его можно только после явного согласия партнера.,,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+penalty_seed_001,1,penalty,light,Игровой штраф 1,"Легкий игровой штраф номер 1: сделать паузу, комплимент или короткое задание без давления.",,60,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+desire_seed_002,2,desire,light,Желание 2,Сохраните мягкое желание номер 2; использовать его можно только после явного согласия партнера.,,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+penalty_seed_002,1,penalty,light,Игровой штраф 2,"Легкий игровой штраф номер 2: сделать паузу, комплимент или короткое задание без давления.",,60,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+desire_seed_003,2,desire,light,Желание 3,Сохраните мягкое желание номер 3; использовать его можно только после явного согласия партнера.,,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+penalty_seed_003,1,penalty,light,Игровой штраф 3,"Легкий игровой штраф номер 3: сделать паузу, комплимент или короткое задание без давления.",,60,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+desire_seed_004,2,desire,light,Желание 4,Сохраните мягкое желание номер 4; использовать его можно только после явного согласия партнера.,,,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
+penalty_seed_004,1,penalty,light,Игровой штраф 4,"Легкий игровой штраф номер 4: сделать паузу, комплимент или короткое задание без давления.",,60,,,base_tasks,approved,1,0,0,0,normal,,,,,generated seed
