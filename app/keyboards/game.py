@@ -10,6 +10,7 @@ def main_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Русская рулетка", callback_data="game:roulette")],
             [InlineKeyboardButton(text="Настройки реквизита", callback_data="inv:menu")],
             [InlineKeyboardButton(text="Границы на сегодня", callback_data="boundaries:menu")],
+            [InlineKeyboardButton(text="Админка", callback_data="admin:menu")],
             [InlineKeyboardButton(text="Включить уровень 4", callback_data="game:level4")],
             [InlineKeyboardButton(text="Включить hard", callback_data="game:hard")],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
