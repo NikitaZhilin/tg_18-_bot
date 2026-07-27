@@ -3,6 +3,14 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+LEVEL_LABELS = {
+    1: "1 - Флирт",
+    2: "2 - Разогрев",
+    3: "3 - Секс",
+    4: "4 - BDSM",
+}
+
+
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -30,15 +38,12 @@ def consent_menu() -> InlineKeyboardMarkup:
 def level_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(text="1", callback_data="game:level:1"),
-                InlineKeyboardButton(text="2", callback_data="game:level:2"),
-                InlineKeyboardButton(text="3", callback_data="game:level:3"),
-                InlineKeyboardButton(text="4", callback_data="game:level:4"),
-            ],
-            [InlineKeyboardButton(text="Русская рулетка", callback_data="game:roulette")],
+            [InlineKeyboardButton(text=label, callback_data=f"game:level:{level}")]
+            for level, label in LEVEL_LABELS.items()
+        ] + [
+            [InlineKeyboardButton(text="Рулетка без выбора уровня", callback_data="game:roulette")],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
-        ]
+        ],
     )
 
 
@@ -50,7 +55,8 @@ def intensity_menu(level: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Средние", callback_data=f"game:intensity:{level}:medium"),
                 InlineKeyboardButton(text="Жесткие", callback_data=f"game:intensity:{level}:hard"),
             ],
-            [InlineKeyboardButton(text="Назад", callback_data="game:menu")],
+            [InlineKeyboardButton(text="Рулетка уровня", callback_data=f"game:roulette_level:{level}:any")],
+            [InlineKeyboardButton(text="К уровням", callback_data="game:menu")],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
         ]
     )
@@ -67,7 +73,8 @@ def category_menu(level: int, intensity: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Поза", callback_data=f"game:category:{level}:{intensity}:pose"),
                 InlineKeyboardButton(text="Желание", callback_data=f"game:category:{level}:{intensity}:desire"),
             ],
-            [InlineKeyboardButton(text="Назад", callback_data=f"game:level:{level}")],
+            [InlineKeyboardButton(text="Рулетка уровня", callback_data=f"game:roulette_level:{level}:{intensity}")],
+            [InlineKeyboardButton(text="К уровням", callback_data="game:menu")],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
         ]
     )

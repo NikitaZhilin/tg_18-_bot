@@ -40,6 +40,14 @@ class TimerService:
             int(turn["timer_seconds"]),
         )
 
+    async def process_due_timers(self, notify: Callable[[int, str], Awaitable[None]]) -> None:
+        for timer in self.timers.due():
+            self.timers.mark_completed(int(timer["id"]))
+            session = self.db.fetchone("SELECT chat_key FROM sessions WHERE id = ?", (timer["session_id"],))
+            if session:
+                chat_id = int(str(session["chat_key"]).split(":", 1)[0])
+                await notify(chat_id, "Время вышло.")
+
     async def run_due_loop(
         self,
         notify: Callable[[int, str], Awaitable[None]],
@@ -48,12 +56,7 @@ class TimerService:
     ) -> None:
         while True:
             try:
-                for timer in self.timers.due():
-                    self.timers.mark_completed(int(timer["id"]))
-                    session = self.db.fetchone("SELECT chat_key FROM sessions WHERE id = ?", (timer["session_id"],))
-                    if session:
-                        chat_id = int(str(session["chat_key"]).split(":", 1)[0])
-                        await notify(chat_id, "Таймер завершен.")
+                await self.process_due_timers(notify)
             except asyncio.CancelledError:
                 raise
             except Exception:

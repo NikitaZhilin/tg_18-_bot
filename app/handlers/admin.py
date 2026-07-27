@@ -10,10 +10,21 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.config import Config
-from app.handlers.common import reject_callback_if_not_admin, reject_if_not_allowed
-from app.keyboards.admin import admin_menu, card_manage, category_choice, import_confirm_choice, intensity_choice, level_choice, save_choice
+from app.handlers.common import message_thread_id, reject_callback_if_not_admin, reject_callback_if_not_allowed, reject_if_not_allowed
+from app.keyboards.admin import (
+    admin_menu,
+    admin_navigation,
+    card_manage,
+    category_choice,
+    import_confirm_choice,
+    intensity_choice,
+    level_choice,
+    save_choice,
+)
+from app.keyboards.game import main_menu
 from app.services.admin_service import AdminService
 from app.services.export_service import save_cards_xlsx
+from app.services.game_service import GameError, GameService
 
 router = Router(name="admin")
 
@@ -35,6 +46,7 @@ class AdminAddCard(StatesGroup):
     search = State()
     import_file = State()
     edit_text = State()
+    restricted_password = State()
 
 
 @router.message(Command("admin"))
@@ -53,6 +65,15 @@ async def cb_admin_menu(callback: CallbackQuery, config: Config, state: FSMConte
         return
     await state.clear()
     await callback.message.answer("Админка контента", reply_markup=admin_menu())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin:home")
+async def cb_admin_home(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    await state.clear()
+    await callback.message.answer("Главное меню", reply_markup=main_menu())
     await callback.answer()
 
 
@@ -92,7 +113,7 @@ async def cb_admin_intensity(callback: CallbackQuery, config: Config, state: FSM
         return
     await state.update_data(intensity=callback.data.split(":")[-1])
     await state.set_state(AdminAddCard.title)
-    await callback.message.answer("Введите название карточки или '-' без названия.")
+    await callback.message.answer("Введите название карточки или '-' без названия.", reply_markup=admin_navigation())
     await callback.answer()
 
 
@@ -102,7 +123,7 @@ async def msg_admin_title(message: Message, config: Config, state: FSMContext) -
         return
     await state.update_data(title="" if message.text == "-" else message.text)
     await state.set_state(AdminAddCard.text)
-    await message.answer("Введите текст карточки.")
+    await message.answer("Введите текст карточки.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.text)
@@ -111,7 +132,7 @@ async def msg_admin_text(message: Message, config: Config, state: FSMContext) ->
         return
     await state.update_data(text=message.text)
     await state.set_state(AdminAddCard.required_items)
-    await message.answer("Введите реквизит кодами через запятую или '-' без реквизита.")
+    await message.answer("Введите реквизит кодами через запятую или '-' без реквизита.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.required_items)
@@ -120,7 +141,7 @@ async def msg_admin_items(message: Message, config: Config, state: FSMContext) -
         return
     await state.update_data(required_items="" if message.text == "-" else message.text)
     await state.set_state(AdminAddCard.timer)
-    await message.answer("Введите таймер в секундах или '-' без таймера.")
+    await message.answer("Введите таймер в секундах или '-' без таймера.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.timer)
@@ -129,7 +150,7 @@ async def msg_admin_timer(message: Message, config: Config, state: FSMContext) -
         return
     await state.update_data(timer_seconds="" if message.text == "-" else message.text)
     await state.set_state(AdminAddCard.risk_tags)
-    await message.answer("Введите risk-tags через запятую или '-' без тегов.")
+    await message.answer("Введите risk-tags через запятую или '-' без тегов.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.risk_tags)
@@ -140,7 +161,7 @@ async def msg_admin_risk_tags(message: Message, config: Config, state: FSMContex
     data = await state.get_data()
     if data.get("category") == "pose":
         await state.set_state(AdminAddCard.pose_family)
-        await message.answer("Для pose: введите pose_family.")
+        await message.answer("Для pose: введите pose_family.", reply_markup=admin_navigation())
         return
     await _show_preview(message, state)
 
@@ -151,7 +172,7 @@ async def msg_pose_family(message: Message, config: Config, state: FSMContext) -
         return
     await state.update_data(pose_family=message.text)
     await state.set_state(AdminAddCard.pose_difficulty)
-    await message.answer("Введите pose_difficulty: easy, medium или hard.")
+    await message.answer("Введите pose_difficulty: easy, medium или hard.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.pose_difficulty)
@@ -160,7 +181,7 @@ async def msg_pose_difficulty(message: Message, config: Config, state: FSMContex
         return
     await state.update_data(pose_difficulty=message.text)
     await state.set_state(AdminAddCard.space_required)
-    await message.answer("Введите space_required: bed, floor, chair, wall или any.")
+    await message.answer("Введите space_required: bed, floor, chair, wall или any.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.space_required)
@@ -169,7 +190,7 @@ async def msg_space_required(message: Message, config: Config, state: FSMContext
         return
     await state.update_data(space_required=message.text)
     await state.set_state(AdminAddCard.body_load)
-    await message.answer("Введите body_load: low, medium или high.")
+    await message.answer("Введите body_load: low, medium или high.", reply_markup=admin_navigation())
 
 
 @router.message(AdminAddCard.body_load)
@@ -293,7 +314,10 @@ async def cb_admin_edit(callback: CallbackQuery, config: Config, state: FSMConte
     card_id = int(callback.data.split(":")[-1])
     await state.update_data(edit_card_id=card_id)
     await state.set_state(AdminAddCard.edit_text)
-    await callback.message.answer(f"Введите новый текст для карточки #{card_id}. После правки она станет черновиком.")
+    await callback.message.answer(
+        f"Введите новый текст для карточки #{card_id}. После правки она станет черновиком.",
+        reply_markup=admin_navigation(),
+    )
     await callback.answer()
 
 
@@ -313,7 +337,7 @@ async def cb_admin_search(callback: CallbackQuery, config: Config, state: FSMCon
     if await reject_callback_if_not_admin(callback, config):
         return
     await state.set_state(AdminAddCard.search)
-    await callback.message.answer("Введите ID, заголовок или фрагмент текста.")
+    await callback.message.answer("Введите ID, заголовок или фрагмент текста.", reply_markup=admin_navigation())
     await callback.answer()
 
 
@@ -338,7 +362,10 @@ async def cb_admin_import(callback: CallbackQuery, config: Config, state: FSMCon
     if await reject_callback_if_not_admin(callback, config):
         return
     await state.set_state(AdminAddCard.import_file)
-    await callback.message.answer("Отправьте CSV/XLSX/DOCX файлом. Сначала будет проверка без загрузки.")
+    await callback.message.answer(
+        "Отправьте CSV/XLSX/DOCX файлом. Сначала будет проверка без загрузки.",
+        reply_markup=admin_navigation(),
+    )
     await callback.answer()
 
 
@@ -347,7 +374,7 @@ async def msg_admin_import(message: Message, config: Config, state: FSMContext, 
     if await reject_if_not_allowed(message, config):
         return
     if not message.document:
-        await message.answer("Нужно отправить файл.")
+        await message.answer("Нужно отправить файл.", reply_markup=admin_navigation())
         return
     suffix = Path(message.document.file_name or "").suffix or ".csv"
     with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -399,8 +426,55 @@ async def cb_admin_export(callback: CallbackQuery, config: Config, admin_service
     await callback.message.answer_document(
         FSInputFile(export_path, filename="cards_export.xlsx"),
         caption="Экспорт карточек (.xlsx)",
+        reply_markup=admin_navigation(),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "admin:restricted")
+async def cb_admin_restricted(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    if not config.admin_content_password_sha256:
+        await callback.message.answer("Пароль закрытого доступа не настроен на сервере.", reply_markup=admin_menu())
+        await callback.answer()
+        return
+    await state.set_state(AdminAddCard.restricted_password)
+    await callback.message.answer("Введите админский пароль для закрытого доступа.", reply_markup=admin_navigation())
+    await callback.answer()
+
+
+@router.message(AdminAddCard.restricted_password)
+async def msg_admin_restricted_password(
+    message: Message,
+    config: Config,
+    state: FSMContext,
+    game_service: GameService,
+) -> None:
+    if await reject_if_not_allowed(message, config):
+        return
+    if not message.from_user or not config.is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Админка недоступна.")
+        return
+    password = message.text or ""
+    try:
+        await message.delete()
+    except Exception:
+        pass
+    if not config.verify_admin_content_password(password):
+        await state.clear()
+        await message.answer("Пароль неверный.", reply_markup=admin_menu())
+        return
+    try:
+        game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
+        game_service.unlock_restricted_content(message.chat.id, message_thread_id(message))
+    except GameError as exc:
+        await state.clear()
+        await message.answer(str(exc), reply_markup=admin_menu())
+        return
+    await state.clear()
+    await message.answer("Закрытый доступ включен для текущей сессии.", reply_markup=admin_menu())
 
 
 @router.callback_query(F.data == "admin:collections")

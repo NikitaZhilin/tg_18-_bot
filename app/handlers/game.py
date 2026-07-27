@@ -50,7 +50,13 @@ async def cb_base_consent(callback: CallbackQuery, config: Config, game_service:
     except GameError as exc:
         await callback.answer(str(exc), show_alert=True)
         return
-    text = "Оба подтверждения получены. Можно начинать." if ready else "Подтверждение записано. Нужно подтверждение второго игрока."
+    text = (
+        "Подтверждение получено. Можно начинать."
+        if ready and config.single_account_two_players
+        else "Оба подтверждения получены. Можно начинать."
+        if ready
+        else "Подтверждение записано. Нужно подтверждение второго игрока."
+    )
     await callback.message.answer(text, reply_markup=main_menu())
     await callback.answer()
 
@@ -138,12 +144,45 @@ async def cb_roulette(callback: CallbackQuery, config: Config, game_service: Gam
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("game:roulette_level:"))
+async def cb_roulette_level(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    _, _, level, intensity = callback.data.split(":")
+    selected_intensity = None if intensity == "any" else intensity
+    try:
+        result = game_service.draw_card(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            callback.from_user.id,
+            level=int(level),
+            category=None,
+            intensity=selected_intensity,
+            source="roulette",
+        )
+    except NoCardsAvailable:
+        await callback.message.answer(
+            "Подходящих карточек не осталось или они не подходят под выбранный реквизит.",
+            reply_markup=level_menu(),
+        )
+        await callback.answer()
+        return
+    except GameError as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
+    await callback.message.answer(
+        format_card(result.card),
+        reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "game:done")
 async def cb_done(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
-    game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "completed")
-    await callback.message.answer("Ход завершен. Передаю ход партнеру.", reply_markup=main_menu())
+    next_player = game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "completed")
+    await callback.message.answer(f"Ход завершен. Следующий: {next_player}.", reply_markup=main_menu())
     await callback.answer()
 
 
@@ -154,8 +193,8 @@ async def cb_skip(callback: CallbackQuery, config: Config, game_service: GameSer
     session = game_service.active_session(_chat_id(callback), callback_thread_id(callback))
     if session:
         safety_service.safe_skip(int(session["id"]), session["active_turn_id"], callback.from_user.id)
-    game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "skipped")
-    await callback.message.answer("Карточка пропущена без штрафа. Передаю ход партнеру.", reply_markup=main_menu())
+    next_player = game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "skipped")
+    await callback.message.answer(f"Карточка пропущена без штрафа. Следующий: {next_player}.", reply_markup=main_menu())
     await callback.answer()
 
 
@@ -195,7 +234,11 @@ async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameS
     if await reject_callback_if_not_allowed(callback, config):
         return
     enabled = game_service.set_level_4_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
-    text = "Уровень 4 включен." if enabled else "Согласие записано. Нужно подтверждение второго игрока."
+    text = (
+        "Уровень 4 включен."
+        if enabled
+        else "Согласие записано. Нужно подтверждение второго игрока."
+    )
     await callback.message.answer(text, reply_markup=main_menu())
     await callback.answer()
 
@@ -205,7 +248,11 @@ async def cb_hard(callback: CallbackQuery, config: Config, game_service: GameSer
     if await reject_callback_if_not_allowed(callback, config):
         return
     enabled = game_service.set_hard_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, True)
-    text = "Hard-интенсивность включена." if enabled else "Согласие записано. Нужно подтверждение второго игрока."
+    text = (
+        "Hard-интенсивность включена."
+        if enabled
+        else "Согласие записано. Нужно подтверждение второго игрока."
+    )
     await callback.message.answer(text, reply_markup=main_menu())
     await callback.answer()
 

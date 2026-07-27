@@ -19,7 +19,17 @@ def admin_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Импорт CSV/XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Коллекции", callback_data="admin:collections")],
             [InlineKeyboardButton(text="Экспорт", callback_data="admin:export")],
-            [InlineKeyboardButton(text="В игру", callback_data="game:menu")],
+            [InlineKeyboardButton(text="Закрытый доступ", callback_data="admin:restricted")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def admin_navigation() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="В админку", callback_data="admin:menu")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
@@ -36,6 +46,7 @@ def category_choice(prefix: str = "admin:cat") -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="desire", callback_data=f"{prefix}:desire"),
             ],
             [InlineKeyboardButton(text="penalty", callback_data=f"{prefix}:penalty")],
+            [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
         ]
     )
 
@@ -48,7 +59,8 @@ def level_choice(prefix: str = "admin:level") -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="2", callback_data=f"{prefix}:2"),
                 InlineKeyboardButton(text="3", callback_data=f"{prefix}:3"),
                 InlineKeyboardButton(text="4", callback_data=f"{prefix}:4"),
-            ]
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
         ]
     )
 
@@ -60,7 +72,8 @@ def intensity_choice(prefix: str = "admin:intensity") -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="light", callback_data=f"{prefix}:light"),
                 InlineKeyboardButton(text="medium", callback_data=f"{prefix}:medium"),
                 InlineKeyboardButton(text="hard", callback_data=f"{prefix}:hard"),
-            ]
+            ],
+            [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
         ]
     )
 
@@ -97,5 +110,6 @@ def card_manage(card_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Отключить", callback_data=f"admin:disable:{card_id}"),
             ],
             [InlineKeyboardButton(text="В админку", callback_data="admin:menu")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )

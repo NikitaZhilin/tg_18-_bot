@@ -46,15 +46,24 @@ class SessionRepository:
         player_2_id: int,
         current_player_id: int,
         allow_level_4: bool = False,
+        current_player_slot: str = "player_1",
     ) -> int:
         cur = self.db.execute(
             """
             INSERT INTO sessions (
-                chat_key, player_1_id, player_2_id, current_player_id, allow_level_4, updated_at
+                chat_key, player_1_id, player_2_id, current_player_id,
+                current_player_slot, allow_level_4, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
-            (chat_key, player_1_id, player_2_id, current_player_id, 1 if allow_level_4 else 0),
+            (
+                chat_key,
+                player_1_id,
+                player_2_id,
+                current_player_id,
+                current_player_slot,
+                1 if allow_level_4 else 0,
+            ),
         )
         return int(cur.lastrowid)
 
@@ -109,6 +118,12 @@ class SessionRepository:
         self.db.execute(
             "UPDATE sessions SET max_intensity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (intensity, session_id),
+        )
+
+    def set_restricted_content(self, session_id: int, enabled: bool) -> None:
+        self.db.execute(
+            "UPDATE sessions SET allow_restricted_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (1 if enabled else 0, session_id),
         )
 
     def finish_session(self, session_id: int, status: str, reason: str | None = None) -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.helpers import import_seed, migrated_db
+from tests.helpers import import_restricted_seed, import_seed, migrated_db
 
 
 def test_seed_content_counts_match_tz(tmp_path):
@@ -33,4 +33,21 @@ def test_hard_and_level4_seed_cards_require_review(tmp_path):
         """
     )
     assert row["count"] == 0
+    db.close()
+
+
+def test_restricted_content_imports_into_closed_collection(tmp_path):
+    db = migrated_db(tmp_path)
+    import_restricted_seed(db)
+    row = db.fetchone(
+        """
+        SELECT COUNT(*) AS count
+        FROM cards c
+        JOIN card_collection_items cci ON cci.card_id = c.id
+        WHERE cci.collection_code = 'restricted_content'
+          AND c.review_status = 'approved'
+          AND c.is_enabled = 1
+        """
+    )
+    assert row["count"] == 12
     db.close()

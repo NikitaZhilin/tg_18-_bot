@@ -21,9 +21,26 @@ ALLOWED_TELEGRAM_USER_IDS=
 ADMIN_TELEGRAM_USER_IDS=
 PLAYER_1_NAME=
 PLAYER_2_NAME=
+SINGLE_ACCOUNT_TWO_PLAYERS=false
+ADMIN_CONTENT_PASSWORD_SHA256=
 ```
 
 Токены, пароли и приватные ID не коммитятся.
+
+Если два человека играют с одного Telegram-аккаунта, укажите один `ALLOWED_TELEGRAM_USER_IDS`
+и включите:
+
+```text
+SINGLE_ACCOUNT_TWO_PLAYERS=true
+```
+
+Закрытая коллекция карточек не выпадает в игре по умолчанию. Для доступа админ открывает
+`Админка -> Закрытый доступ`, вводит пароль, и текущая сессия получает доступ к карточкам
+из коллекции `restricted_content`. В `.env` хранится только SHA-256 пароля:
+
+```powershell
+python -c "import hashlib, getpass; print(hashlib.sha256(getpass.getpass().encode()).hexdigest())"
+```
 
 ## Команды
 

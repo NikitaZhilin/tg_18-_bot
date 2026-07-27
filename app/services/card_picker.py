@@ -49,6 +49,16 @@ class CardPicker:
             params.append(filters.intensity)
         if not filters.allow_level_4:
             where.append("c.level < 4")
+        if not filters.allow_restricted_content:
+            where.append(
+                """
+                NOT EXISTS (
+                    SELECT 1 FROM card_collection_items restricted
+                    WHERE restricted.card_id = c.id
+                      AND restricted.collection_code = 'restricted_content'
+                )
+                """
+            )
 
         rows = executor.execute(
             f"""

@@ -29,7 +29,25 @@ class Database:
         for migration in sorted(base.glob("*.sql")):
             sql = migration.read_text(encoding="utf-8")
             with self._lock:
+                self._conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        name TEXT PRIMARY KEY,
+                        applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                already_applied = self._conn.execute(
+                    "SELECT 1 FROM schema_migrations WHERE name = ?",
+                    (migration.name,),
+                ).fetchone()
+                if already_applied:
+                    continue
                 self._conn.executescript(sql)
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)",
+                    (migration.name,),
+                )
                 self._conn.commit()
 
     @contextmanager

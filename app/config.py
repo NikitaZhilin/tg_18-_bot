@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import hmac
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,6 +51,8 @@ class Config:
     dry_run: bool
     allow_unlisted_users: bool
     allow_level_4_default: bool
+    single_account_two_players: bool
+    admin_content_password_sha256: str | None
     telegram_proxy_url: str | None
 
     @classmethod
@@ -73,6 +77,8 @@ class Config:
             dry_run=_parse_bool(os.getenv("DRY_RUN"), False),
             allow_unlisted_users=_parse_bool(os.getenv("ALLOW_UNLISTED_USERS"), False),
             allow_level_4_default=_parse_bool(os.getenv("ALLOW_LEVEL_4_DEFAULT"), False),
+            single_account_two_players=_parse_bool(os.getenv("SINGLE_ACCOUNT_TWO_PLAYERS"), False),
+            admin_content_password_sha256=(os.getenv("ADMIN_CONTENT_PASSWORD_SHA256") or "").strip() or None,
             telegram_proxy_url=os.getenv("TELEGRAM_PROXY_URL") or None,
         )
 
@@ -81,6 +87,12 @@ class Config:
 
     def is_admin(self, user_id: int) -> bool:
         return self.is_allowed(user_id) and user_id in self.admin_user_ids
+
+    def verify_admin_content_password(self, password: str | None) -> bool:
+        if not password or not self.admin_content_password_sha256:
+            return False
+        actual = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(actual, self.admin_content_password_sha256.lower())
 
     def validate_for_runtime(self) -> None:
         if not self.dry_run and not self.bot_token:

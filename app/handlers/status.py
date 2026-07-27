@@ -26,11 +26,12 @@ async def cmd_status(message: Message, config: Config, game_service: GameService
     await message.answer(
         "Статус:\n"
         f"session_id: {status['session_id']}\n"
-        f"текущий игрок: {status['current_player_id']}\n"
+        f"текущий игрок: {status['current_player_label']} ({status['current_player_id']})\n"
         f"использовано карточек: {status['used_cards']}\n"
         f"активный таймер: {status['active_timer'] or 'нет'}\n"
         f"уровень 4: {'включен' if status['allow_level_4'] else 'выключен'}\n"
         f"макс. интенсивность: {status['max_intensity']}\n"
+        f"закрытый доступ: {'включен' if status['restricted_content'] else 'выключен'}\n"
         f"dry_run: {config.dry_run}"
     )
 

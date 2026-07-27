@@ -51,6 +51,7 @@ class PickFilter:
     intensity: str | None = None
     allow_level_4: bool = False
     max_intensity: str = "light"
+    allow_restricted_content: bool = False
 
 
 @dataclass(frozen=True)
