@@ -6,9 +6,17 @@ from app.services.timer_service import TimerService
 from tests.helpers import import_seed, make_config, migrated_db
 
 
+def enable_one_timed_card(db) -> None:
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute(
+        "UPDATE cards SET is_enabled = 1 WHERE external_id = 'task_l1_015'"
+    )
+
+
 def test_stopword_stops_session_turn_and_timer(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    enable_one_timed_card(db)
     game = GameService(db, make_config(tmp_path))
     game.ensure_session(10, None)
     game.accept_base_consent(10, None, 111)
@@ -31,6 +39,7 @@ def test_stopword_stops_session_turn_and_timer(tmp_path):
 def test_manual_reset_stops_turn_and_cancels_timer(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    enable_one_timed_card(db)
     game = GameService(db, make_config(tmp_path))
     game.ensure_session(10, None)
     game.accept_base_consent(10, None, 111)
