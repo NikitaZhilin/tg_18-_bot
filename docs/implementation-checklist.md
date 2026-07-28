@@ -73,7 +73,7 @@ python -m compileall app scripts tests
 python -c "import os, sys, pytest; root=os.getcwd(); os.environ['TEMP']=os.path.join(root,'.tmp','temp'); os.environ['TMP']=os.environ['TEMP']; sys.exit(pytest.main(['-q','--basetemp',os.path.join(root,'.tmp','pytest')]))"
 ```
 
-Результат последней проверки: 62 из 62 тестов прошли.
+Результат последней проверки: 64 из 64 тестов прошли.
 
 ## Сознательные ограничения
 

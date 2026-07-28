@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 
 
@@ -186,6 +187,7 @@ def test_active_sex_and_bdsm_tasks_name_a_concrete_activity_or_explicitly_start_
         "не выполня",
         "провер",
         "восстанов",
+        "нет интимных действий",
     )
     failures = []
     for row in _content_rows():
@@ -231,6 +233,13 @@ def test_previously_reported_contextless_phrases_do_not_return():
         "новое действие из заранее разрешенного списка",
         "выберите одну удобную позу",
         "выберите удобную позу",
+        "названное действие",
+        "после указанного действия",
+        "последнего указанного ответа или проверки",
+        "самостоятельный ход",
+        "самостоятельный игровой штраф",
+        "что нужно убрать из следующих ходов",
+        "как он должен проявляться в следующих ходах",
     )
     failures = []
     for row in _content_rows():
@@ -238,6 +247,61 @@ def test_previously_reported_contextless_phrases_do_not_return():
         matches = [fragment for fragment in forbidden if fragment in text]
         if matches:
             failures.append((row["external_id"], matches))
+    assert failures == []
+
+
+def test_game_cards_do_not_use_unexplained_turn_jargon():
+    failures = []
+    turn_word = re.compile(r"\bход(?:а|ов|е|ом|ы|ах)?\b", re.IGNORECASE)
+    for row in _content_rows():
+        matches = turn_word.findall(f"{row['title']} {row['text']}")
+        if matches:
+            failures.append((row["external_id"], matches))
+    assert failures == []
+
+
+def test_task_context_and_order_do_not_switch_intimate_activity_implicitly():
+    activity_markers = {
+        "vaginal": ("вагинальн", "влагалищ"),
+        "anal": ("анальн",),
+        "oral_penis": ("оральн", "пенис"),
+        "cunnilingus": ("куннилингус", "вульв", "клитор"),
+        "fisting": ("фистинг",),
+    }
+    failures = []
+    for row in _content_rows():
+        if row["category"] != "task" or int(row["level"]) < 3:
+            continue
+        paragraphs = row["text"].casefold().split("\n\n")
+        context = paragraphs[0]
+        order = next(
+            (part for part in paragraphs if part.startswith("порядок:")),
+            "",
+        )
+        if "из порядка ниже" in context:
+            continue
+
+        def activities(section):
+            found = set()
+            for name, markers in activity_markers.items():
+                if name == "oral_penis":
+                    if "оральн" in section and "пенис" in section:
+                        found.add(name)
+                elif any(marker in section for marker in markers):
+                    found.add(name)
+            return found
+
+        context_activities = activities(context)
+        order_activities = activities(order)
+        unexpected = order_activities - context_activities
+        if context_activities and unexpected:
+            failures.append(
+                (
+                    row["external_id"],
+                    sorted(context_activities),
+                    sorted(unexpected),
+                )
+            )
     assert failures == []
 
 
@@ -320,6 +384,7 @@ def test_explicit_card_durations_match_telegram_timers():
         "pose_ks_017": "90",
         "pose_ks_020": "60",
         "pose_ks_024": "90",
+        "desire_seed_002": "180",
     }
     actual = {
         row["external_id"]: row["timer_seconds"]
