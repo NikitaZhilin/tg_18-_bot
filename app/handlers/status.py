@@ -31,7 +31,7 @@ async def cmd_status(message: Message, config: Config, game_service: GameService
         f"активный таймер: {status['active_timer'] or 'нет'}\n"
         f"уровень 4: {'включен' if status['allow_level_4'] else 'выключен'}\n"
         f"макс. интенсивность: {status['max_intensity']}\n"
-        f"закрытый доступ: {'включен' if status['restricted_content'] else 'выключен'}\n"
+        f"закрытые темы: {'включены' if status['restricted_content'] else 'выключены'}\n"
         f"dry_run: {config.dry_run}"
     )
 

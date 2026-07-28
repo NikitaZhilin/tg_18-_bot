@@ -15,6 +15,9 @@ class GameError(RuntimeError):
     pass
 
 
+BASE_CONSENT_REQUIRED = "Нужно подтвердить согласие перед началом игры"
+
+
 @dataclass(frozen=True)
 class DrawResult:
     turn_id: int
@@ -79,11 +82,11 @@ class GameService:
     def active_session(self, chat_id: int, thread_id: int | None) -> sqlite3.Row | None:
         return self.sessions.get_active(self.sessions.chat_key(chat_id, thread_id))
 
-    def set_items_for_active_session(self, chat_id: int, thread_id: int | None, item_codes: list[str]) -> None:
+    def set_items_for_active_session(self, chat_id: int, thread_id: int | None, items: dict[str, int]) -> None:
         session = self.active_session(chat_id, thread_id)
         if not session:
             raise GameError("Нет активной сессии")
-        self.sessions.set_items(int(session["id"]), item_codes)
+        self.sessions.set_items(int(session["id"]), items)
 
     def accept_base_consent(self, chat_id: int, thread_id: int | None, user_id: int) -> bool:
         session = self.active_session(chat_id, thread_id)
@@ -92,17 +95,28 @@ class GameService:
         self.sessions.add_consent(int(session["id"]), user_id, "base_game", True)
         return self.sessions.accepted_count(int(session["id"]), "base_game") >= self._required_consent_count(session)
 
-    def items_for_active_session(self, chat_id: int, thread_id: int | None) -> set[str]:
+    def items_for_active_session(self, chat_id: int, thread_id: int | None) -> dict[str, int]:
         session = self.active_session(chat_id, thread_id)
         if not session:
-            return set()
+            return {}
         return {
-            row["item_code"]
+            row["item_code"]: int(row["frequency"])
             for row in self.db.fetchall(
-                "SELECT item_code FROM session_items WHERE session_id = ?",
+                "SELECT item_code, frequency FROM session_items WHERE session_id = ?",
                 (session["id"],),
             )
         }
+
+    def available_items(self) -> list[sqlite3.Row]:
+        return self.db.fetchall(
+            "SELECT code, name FROM items WHERE is_active = 1 ORDER BY name"
+        )
+
+    def has_base_consent(self, chat_id: int, thread_id: int | None) -> bool:
+        session = self.active_session(chat_id, thread_id)
+        if not session:
+            return False
+        return self.sessions.accepted_count(int(session["id"]), "base_game") >= self._required_consent_count(session)
 
     def set_boundaries_for_active_session(self, chat_id: int, thread_id: int | None, risk_tags: list[str], user_id: int | None = None) -> None:
         session = self.active_session(chat_id, thread_id)
@@ -134,6 +148,16 @@ class GameService:
         if not session:
             raise GameError("Нет активной сессии")
         self.sessions.add_consent(int(session["id"]), user_id, "hard_intensity", accepted)
+        if not accepted:
+            self.sessions.set_max_intensity(int(session["id"]), "medium")
+            self.db.execute(
+                """
+                INSERT INTO safety_events (session_id, user_id, event_type)
+                VALUES (?, ?, 'hard_disabled')
+                """,
+                (int(session["id"]), user_id),
+            )
+            return False
         if self.sessions.accepted_count(int(session["id"]), "hard_intensity") >= self._required_consent_count(session):
             self.sessions.set_max_intensity(int(session["id"]), "hard")
             self.db.execute(
@@ -151,6 +175,16 @@ class GameService:
         if not session:
             raise GameError("Нет активной сессии")
         self.sessions.add_consent(int(session["id"]), user_id, "level_4", accepted)
+        if not accepted:
+            self.sessions.set_level_4(int(session["id"]), False)
+            self.db.execute(
+                """
+                INSERT INTO safety_events (session_id, user_id, event_type)
+                VALUES (?, ?, 'level_4_disabled')
+                """,
+                (int(session["id"]), user_id),
+            )
+            return False
         if self.sessions.accepted_count(int(session["id"]), "level_4") >= self._required_consent_count(session):
             self.sessions.set_level_4(int(session["id"]), True)
             self.db.execute(
@@ -180,9 +214,11 @@ class GameService:
             if not session:
                 raise GameError("Нет активной сессии")
             if self.sessions.accepted_count(int(session["id"]), "base_game") < self._required_consent_count(session):
-                raise GameError("Нужно базовое подтверждение перед началом игры")
+                raise GameError(BASE_CONSENT_REQUIRED)
             if int(session["current_player_id"]) != int(user_id):
                 raise GameError("Сейчас ход другого игрока")
+            if session["active_turn_id"]:
+                raise GameError("Сначала завершите текущую карточку или откройте ее кнопкой «Продолжить карточку»")
             if level == 4 and not bool(session["allow_level_4"]):
                 raise GameError("Уровень 4 нужно включить отдельным согласием")
             if intensity == "hard" and session["max_intensity"] != "hard":
@@ -221,11 +257,23 @@ class GameService:
                 """
                 INSERT INTO turns (
                     session_id, turn_number, player_id, card_id, source, status,
-                    selected_level, selected_category, selected_intensity, player_slot
+                    selected_level, selected_category, selected_intensity, player_slot,
+                    selected_item_code
                 )
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
                 """,
-                (session["id"], turn_number, user_id, card.id, source, level, category, intensity, current_slot),
+                (
+                    session["id"],
+                    turn_number,
+                    user_id,
+                    card.id,
+                    source,
+                    level,
+                    category,
+                    intensity,
+                    current_slot,
+                    card.selected_item_code,
+                ),
             )
             turn_id = int(cur.lastrowid)
             conn.execute(
@@ -249,6 +297,15 @@ class GameService:
                 (turn_id, session["id"]),
             )
         return DrawResult(turn_id, card)
+
+    def current_card(self, chat_id: int, thread_id: int | None) -> DrawResult | None:
+        session = self.active_session(chat_id, thread_id)
+        if not session or not session["active_turn_id"]:
+            return None
+        card = self.card_picker.for_turn(int(session["active_turn_id"]))
+        if not card:
+            return None
+        return DrawResult(int(session["active_turn_id"]), card)
 
     def finish_turn(self, chat_id: int, thread_id: int | None, user_id: int, status: str = "completed") -> str:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
@@ -284,6 +341,12 @@ class GameService:
             raise GameError("Нет активной сессии")
         self.sessions.set_restricted_content(int(session["id"]), True)
 
+    def disable_restricted_content(self, chat_id: int, thread_id: int | None) -> None:
+        session = self.active_session(chat_id, thread_id)
+        if not session:
+            raise GameError("Нет активной сессии")
+        self.sessions.set_restricted_content(int(session["id"]), False)
+
     def reset_session(self, chat_id: int, thread_id: int | None) -> None:
         session = self.active_session(chat_id, thread_id)
         if session:
@@ -309,11 +372,29 @@ class GameService:
             "allow_level_4": bool(session["allow_level_4"]),
             "max_intensity": session["max_intensity"],
             "restricted_content": bool(session["allow_restricted_content"]),
+            "has_active_turn": bool(session["active_turn_id"]),
         }
 
 
+LEVEL_NAMES = {1: "Флирт", 2: "Разогрев", 3: "Секс", 4: "BDSM"}
+CATEGORY_NAMES = {
+    "question": "Вопрос",
+    "task": "Задание",
+    "pose": "Поза",
+    "desire": "Желание",
+    "penalty": "Штраф",
+}
+INTENSITY_NAMES = {"light": "легкая", "medium": "средняя", "hard": "жесткая"}
+
+
 def format_card(card: PickedCard) -> str:
-    title = f"{card.title}\n\n" if card.title else ""
+    title = f"{LEVEL_NAMES[card.level]} · {CATEGORY_NAMES[card.category]} №{card.display_number}"
+    intensity = f"\nИнтенсивность: {INTENSITY_NAMES[card.intensity]}" if card.level >= 3 else ""
+    item = ""
+    if card.selected_item_name:
+        item = f"\n\nРеквизит: {card.selected_item_name}."
+        if card.selected_item_usage:
+            item += f"\n{card.selected_item_usage}"
     timer = f"\n\nТаймер: {card.timer_seconds} сек." if card.timer_seconds else ""
     aftercare = "\n\nПосле карточки нужен короткий check-in/aftercare." if card.aftercare_required else ""
-    return f"{title}{card.text}{timer}{aftercare}"
+    return f"{title}{intensity}\n\nЧто нужно сделать:\n{card.text}{item}{timer}{aftercare}"

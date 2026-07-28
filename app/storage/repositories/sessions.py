@@ -67,13 +67,16 @@ class SessionRepository:
         )
         return int(cur.lastrowid)
 
-    def set_items(self, session_id: int, item_codes: Iterable[str]) -> None:
+    def set_items(self, session_id: int, items: dict[str, int]) -> None:
         with self.db.transaction() as conn:
             conn.execute("DELETE FROM session_items WHERE session_id = ?", (session_id,))
-            for code in item_codes:
+            for code, frequency in items.items():
                 conn.execute(
-                    "INSERT OR IGNORE INTO session_items (session_id, item_code) VALUES (?, ?)",
-                    (session_id, code),
+                    """
+                    INSERT OR IGNORE INTO session_items (session_id, item_code, frequency)
+                    VALUES (?, ?, ?)
+                    """,
+                    (session_id, code, max(1, min(3, int(frequency)))),
                 )
 
     def set_blocked_tags(self, session_id: int, tags: Iterable[str]) -> None:

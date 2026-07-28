@@ -67,6 +67,10 @@ class PickedCard:
     safety_level: str
     risk_tags: tuple[str, ...]
     aftercare_required: bool
+    display_number: int
+    selected_item_code: str | None = None
+    selected_item_name: str | None = None
+    selected_item_usage: str | None = None
 
 
 def parse_json_list(value: object) -> list[str]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.card_picker import NoCardsAvailable
-from app.services.game_service import GameError, GameService
+from app.services.game_service import GameError, GameService, format_card
 from tests.helpers import import_restricted_seed, import_seed, make_config, make_single_account_config, migrated_db
 
 
@@ -23,7 +23,7 @@ def test_draws_only_approved_cards_and_prevents_repeats(tmp_path):
     db.close()
 
 
-def test_hard_requires_consent_and_reviewed_cards(tmp_path):
+def test_hard_requires_consent_and_has_reviewed_seed_cards(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
     service = GameService(db, make_config(tmp_path))
@@ -34,8 +34,8 @@ def test_hard_requires_consent_and_reviewed_cards(tmp_path):
         service.draw_card(10, None, 111, level=3, category="task", intensity="hard")
     service.set_hard_consent(10, None, 111, True)
     service.set_hard_consent(10, None, 222, True)
-    with pytest.raises(NoCardsAvailable):
-        service.draw_card(10, None, 111, level=3, category="task", intensity="hard")
+    result = service.draw_card(10, None, 111, level=3, category="task", intensity="hard")
+    assert result.card.intensity == "hard"
     db.close()
 
 
@@ -74,8 +74,8 @@ def test_level4_requires_two_consents(tmp_path):
         service.draw_card(10, None, 111, level=4, category="task", intensity="light")
     assert service.set_level_4_consent(10, None, 111, True) is False
     assert service.set_level_4_consent(10, None, 222, True) is True
-    with pytest.raises(NoCardsAvailable):
-        service.draw_card(10, None, 111, level=4, category="task", intensity="light")
+    result = service.draw_card(10, None, 111, level=4, category="task", intensity="light")
+    assert result.card.level == 4
     db.close()
 
 
@@ -175,4 +175,91 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     service.unlock_restricted_content(10, None)
     result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
     assert result.card.external_id.startswith("restricted_")
+    db.close()
+
+
+def test_card_header_uses_level_category_and_section_number(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute("UPDATE cards SET is_enabled = 1 WHERE external_id = 'task_l2_021'")
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
+    text = format_card(result.card)
+
+    assert text.startswith("Разогрев · Задание №21")
+    assert "Что нужно сделать:" in text
+    assert "Уровень 2 - 21" not in text
+    assert "дышит как обычно" in text
+    db.close()
+
+
+def test_active_card_can_be_resumed_and_blocks_new_draw(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    resumed = service.current_card(10, None)
+
+    assert resumed is not None
+    assert resumed.turn_id == first.turn_id
+    assert resumed.card.id == first.card.id
+    with pytest.raises(GameError, match="текущую карточку"):
+        service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    db.close()
+
+
+def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
+    db = migrated_db(tmp_path)
+    import_restricted_seed(db)
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute("UPDATE cards SET is_enabled = 1 WHERE external_id = 'restricted_l4_hard_fisting_001'")
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+    service.set_level_4_consent(10, None, 111, True)
+    service.set_level_4_consent(10, None, 222, True)
+    service.set_hard_consent(10, None, 111, True)
+    service.set_hard_consent(10, None, 222, True)
+    service.unlock_restricted_content(10, None)
+    service.set_items_for_active_session(10, None, {"gloves": 3, "lubricant": 1})
+
+    result = service.draw_card(10, None, 111, level=4, category="task", intensity="hard")
+    turn = db.fetchone("SELECT selected_item_code FROM turns WHERE id = ?", (result.turn_id,))
+    resumed = service.current_card(10, None)
+
+    assert service.items_for_active_session(10, None) == {"gloves": 3, "lubricant": 1}
+    assert result.card.selected_item_code in {"gloves", "lubricant"}
+    assert turn["selected_item_code"] == result.card.selected_item_code
+    assert resumed is not None
+    assert resumed.card.selected_item_code == result.card.selected_item_code
+    assert "Реквизит:" in format_card(result.card)
+    db.close()
+
+
+def test_level4_and_hard_can_be_disabled_again(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_single_account_config(tmp_path))
+    service.ensure_session(10, None)
+
+    assert service.set_level_4_consent(10, None, 111, True) is True
+    assert service.set_hard_consent(10, None, 111, True) is True
+    service.set_level_4_consent(10, None, 111, False)
+    service.set_hard_consent(10, None, 111, False)
+    status = service.status(10, None)
+
+    assert status["allow_level_4"] is False
+    assert status["max_intensity"] == "medium"
+    event_types = {row["event_type"] for row in db.fetchall("SELECT event_type FROM safety_events")}
+    assert {"level_4_disabled", "hard_disabled"}.issubset(event_types)
     db.close()

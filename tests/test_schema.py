@@ -11,10 +11,15 @@ def test_schema_loads(tmp_path):
     assert row["name"] == "admin_actions"
     session_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(sessions)")}
     turn_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(turns)")}
+    item_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(items)")}
+    session_item_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(session_items)")}
     assert "current_player_slot" in session_columns
     assert "allow_restricted_content" in session_columns
     assert "player_slot" in turn_columns
+    assert "selected_item_code" in turn_columns
+    assert {"min_level", "max_level", "categories", "usage_text", "randomizable"}.issubset(item_columns)
+    assert "frequency" in session_item_columns
     db.apply_migrations()
     applied = db.fetchone("SELECT COUNT(*) AS count FROM schema_migrations")
-    assert applied["count"] >= 3
+    assert applied["count"] >= 4
     db.close()

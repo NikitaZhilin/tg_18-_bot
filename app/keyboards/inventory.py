@@ -1,28 +1,35 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Mapping
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-ITEMS = [
-    ("ice", "Лед"),
-    ("oil", "Масло"),
-    ("rope", "Веревка"),
-    ("blindfold", "Повязка"),
-    ("vibrator", "Вибратор"),
-    ("headphones", "Наушники"),
-    ("candle", "Свеча"),
-    ("clamps", "Зажимы"),
-    ("food", "Еда"),
-]
+FREQUENCY_LABELS = {
+    0: "выключен",
+    1: "редко",
+    2: "иногда",
+    3: "часто",
+}
 
 
-def inventory_menu(selected: set[str] | None = None) -> InlineKeyboardMarkup:
-    selected = selected or set()
+def inventory_menu(items: Sequence[Mapping[str, object]], selected: dict[str, int] | None = None) -> InlineKeyboardMarkup:
+    selected = selected or {}
     rows = []
-    for code, name in ITEMS:
-        mark = "✓ " if code in selected else ""
-        rows.append([InlineKeyboardButton(text=f"{mark}{name}", callback_data=f"inv:toggle:{code}")])
+    for item in items:
+        code = str(item["code"])
+        name = str(item["name"])
+        frequency = int(selected.get(code, 0))
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{name}: {FREQUENCY_LABELS[frequency]}",
+                    callback_data=f"inv:toggle:{code}",
+                )
+            ]
+        )
     rows.append([InlineKeyboardButton(text="Сохранить", callback_data="inv:save")])
-    rows.append([InlineKeyboardButton(text="В меню", callback_data="game:menu")])
+    rows.append([InlineKeyboardButton(text="В меню", callback_data="game:home")])
     rows.append([InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

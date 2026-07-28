@@ -21,7 +21,7 @@ def test_seed_content_counts_match_tz(tmp_path):
     db.close()
 
 
-def test_hard_and_level4_seed_cards_require_review(tmp_path):
+def test_hard_and_level4_built_in_seed_cards_are_reviewed(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
     row = db.fetchone(
@@ -29,10 +29,11 @@ def test_hard_and_level4_seed_cards_require_review(tmp_path):
         SELECT COUNT(*) AS count
         FROM cards
         WHERE (level = 4 OR intensity = 'hard')
-          AND (review_status = 'approved' OR is_enabled = 1)
+          AND review_status = 'approved'
+          AND is_enabled = 1
         """
     )
-    assert row["count"] == 0
+    assert row["count"] == 79
     db.close()
 
 
@@ -49,5 +50,5 @@ def test_restricted_content_imports_into_closed_collection(tmp_path):
           AND c.is_enabled = 1
         """
     )
-    assert row["count"] == 12
+    assert row["count"] == 18
     db.close()

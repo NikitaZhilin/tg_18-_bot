@@ -6,7 +6,7 @@ from aiogram.types import Message
 
 from app.config import Config
 from app.handlers.common import message_thread_id, reject_if_not_allowed
-from app.keyboards.game import consent_menu
+from app.keyboards.game import consent_menu, main_menu
 from app.services.game_service import GameError, GameService
 
 router = Router(name="start")
@@ -20,6 +20,17 @@ async def cmd_start(message: Message, config: Config, game_service: GameService)
         game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
     except GameError as exc:
         await message.answer(str(exc))
+        return
+    if game_service.has_base_consent(message.chat.id, message_thread_id(message)):
+        status = game_service.status(message.chat.id, message_thread_id(message))
+        await message.answer(
+            "Игра уже подтверждена. Текущий прогресс сохранен.",
+            reply_markup=main_menu(
+                allow_level_4=bool(status["allow_level_4"]),
+                hard_enabled=status["max_intensity"] == "hard",
+                has_active_turn=bool(status["has_active_turn"]),
+            ),
+        )
         return
     await message.answer(
         "Игра только для взрослых партнеров по взаимному согласию.\n"

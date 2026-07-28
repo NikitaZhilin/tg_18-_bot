@@ -29,6 +29,22 @@ from app.services.game_service import GameError, GameService
 router = Router(name="admin")
 
 
+def _admin_menu(game_service: GameService, chat_id: int, thread_id: int | None):
+    status = game_service.status(chat_id, thread_id)
+    return admin_menu(restricted_enabled=bool(status.get("restricted_content", False)))
+
+
+def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
+    status = game_service.status(chat_id, thread_id)
+    if not status["active"]:
+        return main_menu()
+    return main_menu(
+        allow_level_4=bool(status["allow_level_4"]),
+        hard_enabled=status["max_intensity"] == "hard",
+        has_active_turn=bool(status["has_active_turn"]),
+    )
+
+
 class AdminAddCard(StatesGroup):
     category = State()
     level = State()
@@ -50,30 +66,55 @@ class AdminAddCard(StatesGroup):
 
 
 @router.message(Command("admin"))
-async def cmd_admin(message: Message, config: Config) -> None:
+async def cmd_admin(message: Message, config: Config, game_service: GameService) -> None:
     if await reject_if_not_allowed(message, config):
         return
     if not message.from_user or not config.is_admin(message.from_user.id):
         await message.answer("Админка недоступна.")
         return
-    await message.answer("Админка контента", reply_markup=admin_menu())
+    game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
+    await message.answer(
+        "Админка контента",
+        reply_markup=_admin_menu(game_service, message.chat.id, message_thread_id(message)),
+    )
 
 
 @router.callback_query(F.data == "admin:menu")
-async def cb_admin_menu(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+async def cb_admin_menu(
+    callback: CallbackQuery,
+    config: Config,
+    state: FSMContext,
+    game_service: GameService,
+) -> None:
     if await reject_callback_if_not_admin(callback, config):
         return
     await state.clear()
-    await callback.message.answer("Админка контента", reply_markup=admin_menu())
+    game_service.ensure_session(
+        callback.message.chat.id,
+        message_thread_id(callback.message),
+        callback.message.chat.title,
+    )
+    await callback.message.answer(
+        "Админка контента",
+        reply_markup=_admin_menu(game_service, callback.message.chat.id, message_thread_id(callback.message)),
+    )
     await callback.answer()
 
 
 @router.callback_query(F.data == "admin:home")
-async def cb_admin_home(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+async def cb_admin_home(
+    callback: CallbackQuery,
+    config: Config,
+    state: FSMContext,
+    game_service: GameService,
+) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
     await state.clear()
-    await callback.message.answer("Главное меню", reply_markup=main_menu())
+    await callback.message.answer(
+        "Главное меню",
+        reply_markup=_main_menu(game_service, callback.message.chat.id, message_thread_id(callback.message)),
+    )
     await callback.answer()
 
 
@@ -432,15 +473,36 @@ async def cb_admin_export(callback: CallbackQuery, config: Config, admin_service
 
 
 @router.callback_query(F.data == "admin:restricted")
-async def cb_admin_restricted(callback: CallbackQuery, config: Config, state: FSMContext) -> None:
+async def cb_admin_restricted(
+    callback: CallbackQuery,
+    config: Config,
+    state: FSMContext,
+    game_service: GameService,
+) -> None:
     if await reject_callback_if_not_admin(callback, config):
         return
     if not config.admin_content_password_sha256:
         await callback.message.answer("Пароль закрытого доступа не настроен на сервере.", reply_markup=admin_menu())
         await callback.answer()
         return
+    game_service.ensure_session(
+        callback.message.chat.id,
+        message_thread_id(callback.message),
+        callback.message.chat.title,
+    )
+    status = game_service.status(callback.message.chat.id, message_thread_id(callback.message))
+    if status.get("restricted_content"):
+        game_service.disable_restricted_content(callback.message.chat.id, message_thread_id(callback.message))
+        await callback.message.edit_reply_markup(
+            reply_markup=_admin_menu(game_service, callback.message.chat.id, message_thread_id(callback.message))
+        )
+        await callback.answer("Закрытые темы выключены.")
+        return
     await state.set_state(AdminAddCard.restricted_password)
-    await callback.message.answer("Введите админский пароль для закрытого доступа.", reply_markup=admin_navigation())
+    await callback.message.answer(
+        "Закрытые темы — это отдельные чувствительные карточки. Они не попадают в игру, пока вы не включите их паролем для текущей сессии.\n\nВведите админский пароль.",
+        reply_markup=admin_navigation(),
+    )
     await callback.answer()
 
 
@@ -474,7 +536,10 @@ async def msg_admin_restricted_password(
         await message.answer(str(exc), reply_markup=admin_menu())
         return
     await state.clear()
-    await message.answer("Закрытый доступ включен для текущей сессии.", reply_markup=admin_menu())
+    await message.answer(
+        "Закрытые темы включены для текущей сессии. Их по-прежнему ограничивают выбранный уровень, интенсивность, границы и реквизит.",
+        reply_markup=_admin_menu(game_service, message.chat.id, message_thread_id(message)),
+    )
 
 
 @router.callback_query(F.data == "admin:collections")

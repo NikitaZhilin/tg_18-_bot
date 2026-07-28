@@ -1,6 +1,6 @@
 # Сверка реализации с ТЗ
 
-Дата проверки: 2026-07-27.
+Дата проверки: 2026-07-28.
 
 ## Реализовано
 
@@ -11,7 +11,8 @@
 | SQLite schema/migrations | Готово | `app/storage/migrations/001_initial.sql` |
 | Сессии, turns, used_cards | Готово | `app/services/game_service.py` |
 | Два игрока на одном Telegram-аккаунте | Готово | `SINGLE_ACCOUNT_TWO_PLAYERS`, `current_player_slot` |
-| Реквизит через checkbox-кнопки | Готово | `app/handlers/game.py`, `session_items` |
+| Реквизит с включением/отключением и частотой | Готово | `session_items.frequency`, inventory UI |
+| Контекстная подстановка подходящего реквизита | Готово | `items.min_level/max_level/categories`, `CardPicker` |
 | Базовое согласие обоих игроков | Готово | `game:base_consent`, `session_consents` |
 | Выбор уровня/категории/интенсивности | Готово | `app/handlers/game.py` |
 | Русская рулетка с safety-фильтрами | Готово | `CardPicker` |
@@ -36,8 +37,11 @@
 | Dry-run импорта | Готово | `/admin`, `scripts/import_cards.py --check` |
 | Экспорт карточек | Готово | `/admin -> Экспорт` |
 | Возврат в админку/главное меню из админских экранов | Готово | `admin_navigation` |
+| Возврат в меню без потери активной карточки | Готово | `game:home`, `game:current`, `sessions.active_turn_id` |
+| Понятный заголовок уровня/типа/номера | Готово | `format_card`, `display_number` |
+| Динамические кнопки level 4 и hard | Готово | state-aware `main_menu`, toggle handlers |
 | Коллекции | Готово | `content_collections`, admin list |
-| Закрытая коллекция по админскому паролю | Готово | `restricted_content`, `ADMIN_CONTENT_PASSWORD_SHA256` |
+| Закрытые темы по админскому паролю с обратным выключением | Готово | `restricted_content`, `ADMIN_CONTENT_PASSWORD_SHA256` |
 | Risk-tags и disabled для запрещенного | Готово | `ContentImporter`, `FORBIDDEN_RISK_TAGS` |
 | Позы в стиле камасутры | Готово | `content/cards.csv`, `docs/kamasutra-pose-pack.md` |
 | Целевая task-матрица 24/24/48/48 | Готово | `content/cards.csv`, тесты |
@@ -56,11 +60,12 @@ python -m compileall app scripts tests
 python -c "import os, sys, pytest; root=os.getcwd(); os.environ['TEMP']=os.path.join(root,'.tmp','temp'); os.environ['TMP']=os.environ['TEMP']; sys.exit(pytest.main(['-q','--basetemp',os.path.join(root,'.tmp','pytest')]))"
 ```
 
-Результат последней проверки: 21 тест прошел.
+Результат последней проверки: 28 тестов прошли.
 
 ## Сознательные ограничения
 
 - Токены и пароли не коммитятся.
-- Hard/level 4 карточки импортируются как `needs_review` и `is_enabled = 0`.
-- Контент seed-файла неграфичный и не содержит опасных практик.
+- Проверенные встроенные hard/level 4 seed-файлы публикуются как `approved`; внешние импорты сохраняют заданный review-статус.
+- Закрытые сложные практики требуют одновременно пароля, level 4, hard opt-in и подходящего реквизита.
+- Запрещенные risk-tags по-прежнему автоматически отключаются и не могут быть открыты паролем.
 - Публичная web-админка не входит в MVP; Telegram-админка входит.

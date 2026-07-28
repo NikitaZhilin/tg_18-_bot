@@ -3,7 +3,10 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def admin_menu() -> InlineKeyboardMarkup:
+def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarkup:
+    restricted_text = "Закрытые темы"
+    if restricted_enabled is not None:
+        restricted_text = f"Закрытые темы: {'включены' if restricted_enabled else 'выключены'}"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Добавить карточку", callback_data="admin:add")],
@@ -19,7 +22,12 @@ def admin_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Импорт CSV/XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Коллекции", callback_data="admin:collections")],
             [InlineKeyboardButton(text="Экспорт", callback_data="admin:export")],
-            [InlineKeyboardButton(text="Закрытый доступ", callback_data="admin:restricted")],
+            [
+                InlineKeyboardButton(
+                    text=restricted_text,
+                    callback_data="admin:restricted",
+                )
+            ],
             [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
@@ -47,6 +55,7 @@ def category_choice(prefix: str = "admin:cat") -> InlineKeyboardMarkup:
             ],
             [InlineKeyboardButton(text="penalty", callback_data=f"{prefix}:penalty")],
             [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
@@ -61,6 +70,7 @@ def level_choice(prefix: str = "admin:level") -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="4", callback_data=f"{prefix}:4"),
             ],
             [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
@@ -74,6 +84,7 @@ def intensity_choice(prefix: str = "admin:intensity") -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="hard", callback_data=f"{prefix}:hard"),
             ],
             [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
@@ -85,6 +96,7 @@ def save_choice() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="На проверку", callback_data="admin:save:needs_review")],
             [InlineKeyboardButton(text="Одобрить и включить", callback_data="admin:save:approved")],
             [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
@@ -94,6 +106,7 @@ def import_confirm_choice() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="Загрузить в базу", callback_data="admin:import:confirm")],
             [InlineKeyboardButton(text="Отмена", callback_data="admin:cancel")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
 
