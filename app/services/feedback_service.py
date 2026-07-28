@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.storage import Database
+from app.storage.repositories.cards import CardRepository
 from app.storage.repositories.sessions import SessionRepository
 
 
@@ -12,6 +13,7 @@ class FeedbackService:
     def __init__(self, db: Database):
         self.db = db
         self.sessions = SessionRepository(db)
+        self.cards = CardRepository(db)
 
     def report_unclear(
         self,
@@ -39,20 +41,29 @@ class FeedbackService:
             raise FeedbackError("Карточка этого хода не найдена")
         participants = {int(row["player_1_id"]), int(row["player_2_id"])}
         if int(user_id) not in participants:
-            raise FeedbackError("Сообщить о карточке может только участник игры")
-        inserted = self.db.execute(
-            """
-            INSERT OR IGNORE INTO card_feedback (
-                card_id, session_id, turn_id, reported_by, player_slot
+            raise FeedbackError("Отправить карточку на доработку может только участник игры")
+        with self.db.transaction() as conn:
+            inserted = conn.execute(
+                """
+                INSERT OR IGNORE INTO card_feedback (
+                    card_id, session_id, turn_id, reported_by, player_slot
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    row["card_id"],
+                    row["session_id"],
+                    row["turn_id"],
+                    user_id,
+                    row["player_slot"],
+                ),
             )
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                row["card_id"],
-                row["session_id"],
-                row["turn_id"],
-                user_id,
-                row["player_slot"],
-            ),
-        )
-        return inserted.rowcount > 0
+            if inserted.rowcount > 0:
+                self.cards.save_version(
+                    int(row["card_id"]),
+                    user_id,
+                    "player_requested_revision",
+                    conn,
+                )
+                self.cards.set_status(int(row["card_id"]), "needs_review", False, conn)
+            return inserted.rowcount > 0

@@ -358,7 +358,7 @@ def _mapped_columns(
 def _card_state_from_label(value: str) -> tuple[str, int, int]:
     if value == "включена":
         return "approved", 1, 0
-    if value == "на проверке":
+    if value in {"на проверке", "на доработке"}:
         return "needs_review", 0, 0
     if value == "отключена":
         return "disabled", 0, 0

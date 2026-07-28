@@ -21,6 +21,9 @@ from app.keyboards.admin import (
     catalog_sections,
     delete_card_confirm,
     edit_choice,
+    review_card_actions,
+    review_complete,
+    revision_queue,
     seed_conflict_choice,
     seed_conflicts,
 )
@@ -86,6 +89,146 @@ async def _show_card(
     )
     if answer:
         await answer_callback(callback)
+
+
+async def _show_next_review_card(
+    callback: CallbackQuery,
+    service: AdminService,
+    admin_user_id: int,
+    *,
+    answer: bool = True,
+) -> None:
+    reviewed, total = service.review_progress(admin_user_id)
+    card = service.get_next_review_card(admin_user_id)
+    if not card:
+        await callback.message.answer(
+            f"Проверка завершена. Просмотрено карточек: {reviewed} из {total}.",
+            reply_markup=review_complete(),
+        )
+    else:
+        await callback.message.answer(
+            f"Режим проверки · просмотрено {reviewed} из {total}\n\n"
+            + _card_text(card),
+            reply_markup=review_card_actions(int(card["id"])),
+        )
+    if answer:
+        await answer_callback(callback)
+
+
+@router.callback_query(F.data == "admin:review")
+async def cb_review_cards(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    await _show_next_review_card(
+        callback,
+        admin_service,
+        callback.from_user.id,
+    )
+
+
+@router.callback_query(F.data.startswith("admin:review_ok:"))
+async def cb_review_card_ok(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    card_id = int(callback.data.split(":")[-1])
+    try:
+        admin_service.mark_reviewed_ok(callback.from_user.id, card_id)
+    except ValueError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await _show_next_review_card(
+        callback,
+        admin_service,
+        callback.from_user.id,
+    )
+
+
+@router.callback_query(F.data.startswith("admin:review_revision:"))
+async def cb_review_card_revision(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    card_id = int(callback.data.split(":")[-1])
+    try:
+        admin_service.mark_card_for_revision(callback.from_user.id, card_id)
+    except ValueError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await callback.message.answer(f"Карточка #{card_id} отправлена на доработку.")
+    await _show_next_review_card(
+        callback,
+        admin_service,
+        callback.from_user.id,
+    )
+
+
+@router.callback_query(F.data == "admin:review_reset")
+async def cb_review_reset(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    admin_service.reset_review_progress(callback.from_user.id)
+    await _show_next_review_card(
+        callback,
+        admin_service,
+        callback.from_user.id,
+    )
+
+
+@router.callback_query(F.data.startswith("admin:revision_queue:"))
+async def cb_revision_queue(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    page = max(0, int(callback.data.split(":")[-1]))
+    total = admin_service.count_revision_cards()
+    if total and page * 10 >= total:
+        page = max(0, (total - 1) // 10)
+    rows = admin_service.list_revision_cards(limit=10, offset=page * 10)
+    text = (
+        f"Карточки на доработке: {total}. Страница {page + 1}."
+        if rows
+        else "Карточек на доработке нет."
+    )
+    await callback.message.answer(
+        text,
+        reply_markup=revision_queue(rows, page=page, total=total),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:revision_card:"))
+async def cb_revision_card(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    _, _, card_id, page = callback.data.split(":")
+    await _show_card(
+        callback,
+        admin_service,
+        int(card_id),
+        back_callback=f"admin:revision_queue:{page}",
+    )
 
 
 @router.callback_query(F.data == "admin:catalog")
@@ -308,9 +451,9 @@ async def cb_card_feedback_list(
         return
     rows = admin_service.list_card_feedback()
     text = (
-        "Карточки, которые игроки отметили как непонятные:"
+        "Сообщения игроков о карточках, отправленных на доработку:"
         if rows
-        else "Новых сообщений о непонятных карточках нет."
+        else "Новых сообщений игроков о карточках нет."
     )
     await callback.message.answer(text, reply_markup=card_feedback_list(rows))
     await answer_callback(callback)
@@ -330,7 +473,7 @@ async def cb_card_feedback_item(
         await answer_callback(callback, "Сообщение уже обработано или не найдено.", show_alert=True)
         return
     await callback.message.answer(
-        f"Непонятная карточка: {feedback['external_id'] or '#' + str(feedback['card_id'])}\n"
+        f"Карточка на доработке: {feedback['external_id'] or '#' + str(feedback['card_id'])}\n"
         f"Игрок: {feedback['player_slot']}\n"
         f"Отмечена: {feedback['created_at']}\n\n"
         f"{feedback['text']}",

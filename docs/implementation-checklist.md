@@ -23,7 +23,9 @@
 | CRUD карточек и реквизита | Готово | `AdminService`, admin handlers |
 | История и восстановление версии | Готово | `card_versions` |
 | Конфликты seed-обновлений | Готово | `seed_conflicts` |
-| Жалоба на непонятную карточку | Готово | `card_feedback` |
+| Кнопка `На доработку` с отключением и заменой | Готово | `GameService.request_card_revision` |
+| Очередь карточек на доработке | Готово | `review_status = needs_review` |
+| Последовательная проверка с сохранением прогресса | Готово | `card_review_progress` |
 | Русский XLSX и обратный импорт | Готово | export/import services |
 | Контент-аудит всех CSV | Готово | `scripts/audit_card_content.py` |
 | Опасный генератор seed удален | Готово | файл отсутствует |

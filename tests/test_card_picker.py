@@ -321,6 +321,62 @@ def test_replace_keeps_current_card_when_no_replacement_exists(tmp_path):
     db.close()
 
 
+def test_revision_request_disables_card_and_atomically_draws_replacement(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    replacement = service.request_card_revision(10, None, 111, first.turn_id)
+
+    assert replacement is not None
+    assert replacement.card.id != first.card.id
+    marked = db.fetchone(
+        "SELECT review_status, is_enabled FROM cards WHERE id = ?",
+        (first.card.id,),
+    )
+    assert marked["review_status"] == "needs_review"
+    assert int(marked["is_enabled"]) == 0
+    feedback = db.fetchone(
+        "SELECT status FROM card_feedback WHERE turn_id = ?",
+        (first.turn_id,),
+    )
+    assert feedback["status"] == "new"
+    assert service.current_card(10, None).turn_id == replacement.turn_id
+    db.close()
+
+
+def test_revision_request_marks_card_even_when_replacement_is_unavailable(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute("UPDATE cards SET is_enabled = 1 WHERE external_id = 'task_l1_001'")
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    replacement = service.request_card_revision(10, None, 111, first.turn_id)
+
+    assert replacement is None
+    assert service.current_card(10, None) is None
+    status = service.status(10, None)
+    assert status["current_player_id"] == 111
+    marked = db.fetchone(
+        "SELECT review_status, is_enabled FROM cards WHERE id = ?",
+        (first.card.id,),
+    )
+    assert marked["review_status"] == "needs_review"
+    assert int(marked["is_enabled"]) == 0
+    turn = db.fetchone("SELECT status FROM turns WHERE id = ?", (first.turn_id,))
+    assert turn["status"] == "skipped"
+    db.close()
+
+
 def test_roulette_uses_session_default_levels(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)

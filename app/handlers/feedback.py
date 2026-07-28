@@ -35,6 +35,10 @@ async def cb_report_unclear(
         return
     await answer_callback(
         callback,
-        "Карточка добавлена в очередь проверки." if created else "Эта карточка уже отмечена.",
+        (
+            "Карточка отправлена на доработку и отключена от выдачи."
+            if created
+            else "Эта карточка уже отмечена."
+        ),
         show_alert=True,
     )

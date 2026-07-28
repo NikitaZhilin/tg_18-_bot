@@ -348,6 +348,53 @@ async def cb_replace_card(
     await answer_callback(callback)
 
 
+@router.callback_query(F.data.startswith("game:revision:"))
+async def cb_request_card_revision(
+    callback: CallbackQuery,
+    config: Config,
+    game_service: GameService,
+    safety_service: SafetyService,
+) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    turn_id = int(callback.data.split(":")[-1])
+    session = game_service.active_session(_chat_id(callback), callback_thread_id(callback))
+    session_id = int(session["id"]) if session else None
+    try:
+        replacement = game_service.request_card_revision(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            callback.from_user.id,
+            turn_id,
+        )
+    except GameError as exc:
+        await _show_game_error(callback, exc)
+        return
+    if session_id:
+        safety_service.safe_skip(session_id, turn_id, callback.from_user.id)
+    if replacement is None:
+        await callback.message.answer(
+            "Карточка отправлена на доработку и больше не будет выпадать. "
+            "Другой карточки с теми же условиями сейчас нет.",
+            reply_markup=_main_menu(
+                game_service,
+                _chat_id(callback),
+                callback_thread_id(callback),
+            ),
+        )
+        await answer_callback(callback)
+        return
+    await callback.message.answer(
+        "Карточка отправлена на доработку.\n\nНовая карточка:\n\n"
+        + format_card(replacement.card),
+        reply_markup=card_actions(
+            replacement.turn_id,
+            bool(replacement.card.timer_seconds),
+        ),
+    )
+    await answer_callback(callback)
+
+
 @router.callback_query(F.data == "game:default_levels")
 async def cb_default_levels(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):

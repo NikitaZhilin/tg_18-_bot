@@ -25,11 +25,23 @@ def test_unclear_card_feedback_reaches_admin_queue(tmp_path):
     feedback = FeedbackService(db)
     assert feedback.report_unclear(10, 7, result.turn_id, 111) is True
     assert feedback.report_unclear(10, 7, result.turn_id, 111) is False
+    marked = db.fetchone(
+        "SELECT review_status, is_enabled FROM cards WHERE id = ?",
+        (result.card.id,),
+    )
+    assert marked["review_status"] == "needs_review"
+    assert int(marked["is_enabled"]) == 0
 
     admin = AdminService(db)
     queue = admin.list_card_feedback()
     assert len(queue) == 1
     assert int(queue[0]["card_id"]) == result.card.id
-    admin.resolve_card_feedback(111, int(queue[0]["id"]))
+    admin.approve_card(111, result.card.id)
     assert admin.list_card_feedback() == []
+    approved = db.fetchone(
+        "SELECT review_status, is_enabled FROM cards WHERE id = ?",
+        (result.card.id,),
+    )
+    assert approved["review_status"] == "approved"
+    assert int(approved["is_enabled"]) == 1
     db.close()

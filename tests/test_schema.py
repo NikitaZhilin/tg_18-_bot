@@ -26,6 +26,10 @@ def test_schema_loads(tmp_path):
     assert row["name"] == "seed_conflicts"
     row = db.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='card_feedback'")
     assert row["name"] == "card_feedback"
+    row = db.fetchone(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='card_review_progress'"
+    )
+    assert row["name"] == "card_review_progress"
     session_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(sessions)")}
     turn_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(turns)")}
     item_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(items)")}

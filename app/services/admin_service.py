@@ -49,6 +49,16 @@ class AdminService:
             self.cards.set_status(card_id, "approved", True, conn)
             conn.execute(
                 """
+                UPDATE card_feedback
+                SET status = 'resolved',
+                    resolved_by = ?,
+                    resolved_at = CURRENT_TIMESTAMP
+                WHERE card_id = ? AND status = 'new'
+                """,
+                (admin_user_id, card_id),
+            )
+            conn.execute(
+                """
                 INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id, details_json)
                 VALUES (?, 'approve_card', 'card', ?, '{}')
                 """,
@@ -103,6 +113,170 @@ class AdminService:
 
     def list_by_status(self, status: str, limit: int = 10, offset: int = 0):
         return self.cards.list_cards(review_status=status, limit=limit, offset=offset)
+
+    def list_revision_cards(self, limit: int = 10, offset: int = 0):
+        return self.cards.list_cards(
+            review_status="needs_review",
+            include_archived=True,
+            limit=limit,
+            offset=offset,
+        )
+
+    def count_revision_cards(self) -> int:
+        row = self.db.fetchone(
+            """
+            SELECT COUNT(*) AS count
+            FROM cards
+            WHERE deleted_at IS NULL
+              AND review_status = 'needs_review'
+            """
+        )
+        return int(row["count"])
+
+    def get_next_review_card(self, admin_user_id: int) -> dict[str, Any] | None:
+        row = self.db.fetchone(
+            """
+            SELECT c.id
+            FROM cards c
+            LEFT JOIN card_review_progress crp
+              ON crp.admin_user_id = ?
+             AND crp.card_id = c.id
+             AND crp.card_version_marker = (
+                    COALESCE(c.updated_at, c.created_at) || ':' ||
+                    COALESCE((
+                        SELECT MAX(cv.version_number)
+                        FROM card_versions cv
+                        WHERE cv.card_id = c.id
+                    ), 0)
+                )
+            WHERE c.deleted_at IS NULL
+              AND c.is_archived = 0
+              AND crp.card_id IS NULL
+            ORDER BY c.level, c.category, c.id
+            LIMIT 1
+            """,
+            (admin_user_id,),
+        )
+        return self.get_card_detail(int(row["id"])) if row else None
+
+    def review_progress(self, admin_user_id: int) -> tuple[int, int]:
+        row = self.db.fetchone(
+            """
+            SELECT
+                COUNT(*) AS total,
+                SUM(
+                    CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM card_review_progress crp
+                        WHERE crp.admin_user_id = ?
+                          AND crp.card_id = c.id
+                          AND crp.card_version_marker = (
+                                COALESCE(c.updated_at, c.created_at) || ':' ||
+                                COALESCE((
+                                    SELECT MAX(cv.version_number)
+                                    FROM card_versions cv
+                                    WHERE cv.card_id = c.id
+                                ), 0)
+                            )
+                    ) THEN 1 ELSE 0 END
+                ) AS reviewed
+            FROM cards c
+            WHERE c.deleted_at IS NULL
+              AND c.is_archived = 0
+            """,
+            (admin_user_id,),
+        )
+        return int(row["reviewed"] or 0), int(row["total"] or 0)
+
+    def mark_reviewed_ok(self, admin_user_id: int, card_id: int) -> None:
+        with self.db.transaction() as conn:
+            card = self.cards.get(card_id, conn)
+            if not card or card["deleted_at"] or int(card["is_archived"]):
+                raise ValueError("Карточка не найдена")
+            self._save_review_progress(conn, admin_user_id, card_id, "ok")
+            conn.execute(
+                """
+                INSERT INTO admin_actions (
+                    admin_user_id, action_type, target_type, target_id, details_json
+                )
+                VALUES (?, 'update_card', 'card', ?, '{"review_decision":"ok"}')
+                """,
+                (admin_user_id, str(card_id)),
+            )
+
+    def mark_card_for_revision(self, admin_user_id: int, card_id: int) -> None:
+        with self.db.transaction() as conn:
+            card = self.cards.get(card_id, conn)
+            if not card or card["deleted_at"] or int(card["is_archived"]):
+                raise ValueError("Карточка не найдена")
+            if card["review_status"] != "needs_review" or int(card["is_enabled"]):
+                self.cards.save_version(
+                    card_id,
+                    admin_user_id,
+                    "admin_requested_revision",
+                    conn,
+                )
+                self.cards.set_status(card_id, "needs_review", False, conn)
+            self._save_review_progress(
+                conn,
+                admin_user_id,
+                card_id,
+                "needs_revision",
+            )
+            conn.execute(
+                """
+                INSERT INTO admin_actions (
+                    admin_user_id, action_type, target_type, target_id, details_json
+                )
+                VALUES (
+                    ?,
+                    'update_card',
+                    'card',
+                    ?,
+                    '{"review_decision":"needs_revision"}'
+                )
+                """,
+                (admin_user_id, str(card_id)),
+            )
+
+    def reset_review_progress(self, admin_user_id: int) -> None:
+        self.db.execute(
+            "DELETE FROM card_review_progress WHERE admin_user_id = ?",
+            (admin_user_id,),
+        )
+
+    @staticmethod
+    def _save_review_progress(
+        conn,
+        admin_user_id: int,
+        card_id: int,
+        decision: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO card_review_progress (
+                admin_user_id, card_id, card_version_marker, decision, reviewed_at
+            )
+            SELECT
+                ?,
+                id,
+                COALESCE(updated_at, created_at) || ':' ||
+                COALESCE((
+                    SELECT MAX(cv.version_number)
+                    FROM card_versions cv
+                    WHERE cv.card_id = cards.id
+                ), 0),
+                ?,
+                CURRENT_TIMESTAMP
+            FROM cards
+            WHERE id = ?
+            ON CONFLICT(admin_user_id, card_id) DO UPDATE SET
+                card_version_marker = excluded.card_version_marker,
+                decision = excluded.decision,
+                reviewed_at = CURRENT_TIMESTAMP
+            """,
+            (admin_user_id, decision, card_id),
+        )
 
     def get_card(self, card_id: int):
         return self.cards.get(card_id)

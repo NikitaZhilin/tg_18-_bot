@@ -192,7 +192,7 @@ def _card_state(row: Mapping[str, object]) -> str:
     if status == "draft":
         return "Черновик"
     if status == "needs_review":
-        return "На проверке"
+        return "На доработке"
     if status == "approved" and int(_row_value(row, "is_enabled") or 0):
         return "Включена"
     return "Отключена"
@@ -260,7 +260,7 @@ def _write_reference_sheet(sheet) -> None:
         "A": ("Типы карточек", list(CATEGORY_NAMES.values())),
         "B": ("Интенсивность", [value.capitalize() for value in INTENSITY_NAMES.values()]),
         "C": ("Использование реквизита", list(ITEM_MODE_NAMES.values())),
-        "D": ("Состояние карточки", ["Черновик", "На проверке", "Включена", "Отключена", "В архиве"]),
+        "D": ("Состояние карточки", ["Черновик", "На доработке", "Включена", "Отключена", "В архиве"]),
         "E": ("Темы риска", list(RISK_TAG_NAMES.values())),
         "F": ("Сложность позы", list(POSE_DIFFICULTY_NAMES.values())),
         "G": ("Место", list(SPACE_NAMES.values())),

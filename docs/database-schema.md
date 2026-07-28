@@ -21,7 +21,8 @@ app/storage/migrations/016_cleanup_legacy_session_state.sql
   `session_blocked_tags`, `safety_events`.
 - Таймеры: `timers`.
 - Желания: `saved_desires`.
-- Админка: `admin_actions`, `card_versions`, `seed_conflicts`, `card_feedback`.
+- Админка: `admin_actions`, `card_versions`, `seed_conflicts`, `card_feedback`,
+  `card_review_progress`.
 - Временные persisted-состояния: `fsm_states`, `session_setting_drafts`.
 - Эксплуатация: `content_imports`, `app_heartbeats`, `schema_migrations`.
 

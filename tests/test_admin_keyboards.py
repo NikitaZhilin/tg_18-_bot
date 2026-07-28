@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.keyboards.admin import admin_menu, admin_navigation
+from app.keyboards.admin import admin_menu, admin_navigation, review_card_actions
 from app.keyboards.game import (
     card_actions,
     intensity_menu,
@@ -27,7 +27,18 @@ def test_admin_navigation_returns_to_admin_and_main_menu():
 
 
 def test_admin_menu_has_main_menu_return():
-    assert "admin:home" in _callbacks(admin_menu())
+    callbacks = _callbacks(admin_menu())
+    assert "admin:home" in callbacks
+    assert "admin:review" in callbacks
+    assert "admin:revision_queue:0" in callbacks
+
+
+def test_review_keyboard_can_accept_edit_or_mark_card():
+    callbacks = _callbacks(review_card_actions(42))
+    assert "admin:review_ok:42" in callbacks
+    assert "admin:review_revision:42" in callbacks
+    assert "admin:editmenu:42" in callbacks
+    assert "admin:home" in callbacks
 
 
 def test_restricted_button_shows_current_state():
@@ -42,6 +53,7 @@ def test_game_keyboards_have_main_menu_and_dynamic_modes():
     assert "game:home" in _callbacks(intensity_menu(3))
     assert "game:home" in _callbacks(card_actions(1, True))
     assert "game:replace" in _callbacks(card_actions(1, True))
+    assert "game:revision:1" in _callbacks(card_actions(1, True))
     texts = [
         button.text
         for row in main_menu(

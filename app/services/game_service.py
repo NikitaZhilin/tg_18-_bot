@@ -12,6 +12,7 @@ from app.services.card_picker import CardPicker, NoCardsAvailable
 from app.services.errors import GameError
 from app.services.session_settings import SessionSettingsMixin
 from app.storage import Database
+from app.storage.repositories.cards import CardRepository
 from app.storage.repositories.sessions import SessionRepository
 from app.storage.repositories.users import UserRepository
 
@@ -31,6 +32,7 @@ class GameService(SessionSettingsMixin):
         self.config = config
         self.sessions = SessionRepository(db)
         self.users = UserRepository(db)
+        self.cards = CardRepository(db)
         self.card_picker = CardPicker(db)
 
     def _consent_date(self) -> str:
@@ -263,7 +265,44 @@ class GameService(SessionSettingsMixin):
         thread_id: int | None,
         user_id: int,
     ) -> DrawResult:
+        result = self._replace_active_card(
+            chat_id,
+            thread_id,
+            user_id,
+            revision_turn_id=None,
+            allow_no_replacement=False,
+        )
+        if result is None:  # pragma: no cover - normal replacement always raises instead
+            raise NoCardsAvailable("no matching cards")
+        return result
+
+    def request_card_revision(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        user_id: int,
+        turn_id: int,
+    ) -> DrawResult | None:
+        return self._replace_active_card(
+            chat_id,
+            thread_id,
+            user_id,
+            revision_turn_id=turn_id,
+            allow_no_replacement=True,
+        )
+
+    def _replace_active_card(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        user_id: int,
+        *,
+        revision_turn_id: int | None,
+        allow_no_replacement: bool,
+    ) -> DrawResult | None:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
+        replacement: PickedCard | None = None
+        new_turn_id: int | None = None
         with self.db.transaction() as conn:
             session = self.sessions.get_active(chat_key, conn)
             if not session or not session["active_turn_id"]:
@@ -276,6 +315,8 @@ class GameService(SessionSettingsMixin):
                 raise GameError("Активной карточки нет")
             if int(turn["player_id"]) != int(user_id):
                 raise GameError("Сейчас ход другого игрока")
+            if revision_turn_id is not None and int(turn["id"]) != int(revision_turn_id):
+                raise GameError("Эта карточка уже обработана")
             level = turn["selected_level"]
             category = turn["selected_category"]
             intensity = turn["selected_intensity"]
@@ -286,18 +327,47 @@ class GameService(SessionSettingsMixin):
                 levels = self.sessions.enabled_levels(int(session["id"]))
                 if not levels:
                     raise GameError("В настройке уровней по умолчанию не осталось доступных разделов")
-            replacement = self.card_picker.pick(
-                PickFilter(
-                    session_id=int(session["id"]),
-                    level=int(level) if level is not None else None,
-                    levels=levels,
-                    category=category,
-                    intensity=intensity,
-                    collection_code=collection_code,
-                    allow_restricted_content=bool(session["allow_restricted_content"]),
-                ),
-                conn,
-            )
+            try:
+                replacement = self.card_picker.pick(
+                    PickFilter(
+                        session_id=int(session["id"]),
+                        level=int(level) if level is not None else None,
+                        levels=levels,
+                        category=category,
+                        intensity=intensity,
+                        collection_code=collection_code,
+                        allow_restricted_content=bool(session["allow_restricted_content"]),
+                    ),
+                    conn,
+                )
+            except NoCardsAvailable:
+                if not allow_no_replacement:
+                    raise
+
+            if revision_turn_id is not None:
+                card_id = int(turn["card_id"])
+                self.cards.save_version(
+                    card_id,
+                    user_id,
+                    "player_requested_revision",
+                    conn,
+                )
+                self.cards.set_status(card_id, "needs_review", False, conn)
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO card_feedback (
+                        card_id, session_id, turn_id, reported_by, player_slot
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        card_id,
+                        session["id"],
+                        turn["id"],
+                        user_id,
+                        turn["player_slot"],
+                    ),
+                )
             turn_number = int(
                 conn.execute(
                     "SELECT COALESCE(MAX(turn_number), 0) + 1 AS num FROM turns WHERE session_id = ?",
@@ -325,6 +395,17 @@ class GameService(SessionSettingsMixin):
                 """,
                 (session["id"], turn["card_id"]),
             )
+            if replacement is None:
+                conn.execute(
+                    """
+                    UPDATE sessions
+                    SET active_turn_id = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (session["id"],),
+                )
+                return None
             conn.execute(
                 """
                 INSERT INTO turns (
@@ -373,6 +454,8 @@ class GameService(SessionSettingsMixin):
                 "UPDATE sessions SET active_turn_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (new_turn_id, session["id"]),
             )
+        if replacement is None or new_turn_id is None:  # pragma: no cover - guarded above
+            return None
         return DrawResult(new_turn_id, replacement)
 
     def current_card(self, chat_id: int, thread_id: int | None) -> DrawResult | None:

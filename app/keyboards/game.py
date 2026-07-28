@@ -133,8 +133,8 @@ def card_actions(turn_id: int, has_timer: bool) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="Сообщить о непонятной карточке",
-                    callback_data=f"game:report_unclear:{turn_id}",
+                    text="На доработку",
+                    callback_data=f"game:revision:{turn_id}",
                 )
             ],
             [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],

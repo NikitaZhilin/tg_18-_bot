@@ -22,9 +22,11 @@ def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarku
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Добавить карточку", callback_data="admin:add")],
+            [InlineKeyboardButton(text="Проверка карточек", callback_data="admin:review")],
+            [InlineKeyboardButton(text="Карточки на доработке", callback_data="admin:revision_queue:0")],
             [InlineKeyboardButton(text="Каталог карточек", callback_data="admin:catalog")],
             [InlineKeyboardButton(text="Каталог реквизита", callback_data="admin:items:0")],
-            [InlineKeyboardButton(text="Непонятные карточки", callback_data="admin:feedback")],
+            [InlineKeyboardButton(text="Сообщения игроков", callback_data="admin:feedback")],
             [InlineKeyboardButton(text="Конфликты обновлений", callback_data="admin:conflicts")],
             [InlineKeyboardButton(text="Импорт XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Экспорт XLSX", callback_data="admin:export")],
@@ -251,6 +253,82 @@ def card_feedback_actions(feedback_id: int, card_id: int) -> InlineKeyboardMarku
             [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )
+
+
+def review_card_actions(card_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Все понятно",
+                    callback_data=f"admin:review_ok:{card_id}",
+                ),
+                InlineKeyboardButton(
+                    text="На доработку",
+                    callback_data=f"admin:review_revision:{card_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Редактировать",
+                    callback_data=f"admin:editmenu:{card_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="Завершить просмотр", callback_data="admin:menu")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def review_complete() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Начать проверку заново",
+                    callback_data="admin:review_reset",
+                )
+            ],
+            [InlineKeyboardButton(text="В админку", callback_data="admin:menu")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def revision_queue(rows, *, page: int, total: int) -> InlineKeyboardMarkup:
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=(
+                    f"#{row['id']} · "
+                    f"{CATEGORY_NAMES.get(row['category'], row['category'])} · "
+                    f"{INTENSITY_NAMES.get(row['intensity'], row['intensity'])}"
+                ),
+                callback_data=f"admin:revision_card:{row['id']}:{page}",
+            )
+        ]
+        for row in rows
+    ]
+    navigation = []
+    if page > 0:
+        navigation.append(
+            InlineKeyboardButton(
+                text="←",
+                callback_data=f"admin:revision_queue:{page - 1}",
+            )
+        )
+    if (page + 1) * 10 < total:
+        navigation.append(
+            InlineKeyboardButton(
+                text="→",
+                callback_data=f"admin:revision_queue:{page + 1}",
+            )
+        )
+    if navigation:
+        buttons.append(navigation)
+    buttons.append([InlineKeyboardButton(text="В админку", callback_data="admin:menu")])
+    buttons.append([InlineKeyboardButton(text="Главное меню", callback_data="admin:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def catalog_sections() -> InlineKeyboardMarkup:

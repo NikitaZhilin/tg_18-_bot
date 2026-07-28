@@ -26,7 +26,7 @@ INTENSITY_NAMES = {
 
 REVIEW_STATUS_NAMES = {
     "draft": "Черновик",
-    "needs_review": "На проверке",
+    "needs_review": "На доработке",
     "approved": "Одобрена",
     "disabled": "Отключена",
 }
