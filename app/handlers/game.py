@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.config import Config
-from app.handlers.common import callback_thread_id, reject_callback_if_not_allowed
+from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
 from app.keyboards.game import boundary_menu, card_actions, category_menu, consent_menu, intensity_menu, level_menu, main_menu
 from app.keyboards.inventory import inventory_menu
 from app.services.card_picker import NoCardsAvailable
@@ -49,9 +49,9 @@ async def _show_game_error(callback: CallbackQuery, exc: GameError) -> None:
             "Перед первой карточкой подтвердите согласие на игру.",
             reply_markup=consent_menu(),
         )
-        await callback.answer()
+        await answer_callback(callback)
         return
-    await callback.answer(str(exc), show_alert=True)
+    await answer_callback(callback, str(exc), show_alert=True)
 
 
 @router.callback_query(F.data == "game:home")
@@ -62,7 +62,7 @@ async def cb_game_home(callback: CallbackQuery, config: Config, game_service: Ga
         "Главное меню",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:current")
@@ -71,13 +71,13 @@ async def cb_current_card(callback: CallbackQuery, config: Config, game_service:
         return
     result = game_service.current_card(_chat_id(callback), callback_thread_id(callback))
     if not result:
-        await callback.answer("Незавершенной карточки нет.", show_alert=True)
+        await answer_callback(callback, "Незавершенной карточки нет.", show_alert=True)
         return
     await callback.message.answer(
         format_card(result.card),
         reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:menu")
@@ -87,20 +87,20 @@ async def cb_game_menu(callback: CallbackQuery, config: Config, game_service: Ga
     try:
         game_service.ensure_session(_chat_id(callback), callback_thread_id(callback), callback.message.chat.title if callback.message else None)
     except GameError as exc:
-        await callback.answer(str(exc), show_alert=True)
+        await answer_callback(callback, str(exc), show_alert=True)
         return
     if not game_service.has_base_consent(_chat_id(callback), callback_thread_id(callback)):
         await callback.message.answer(
             "Перед первой карточкой подтвердите согласие на игру.",
             reply_markup=consent_menu(),
         )
-        await callback.answer()
+        await answer_callback(callback)
         return
     await callback.message.answer(
         "Выберите уровень:",
         reply_markup=_level_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:base_consent")
@@ -111,7 +111,7 @@ async def cb_base_consent(callback: CallbackQuery, config: Config, game_service:
         game_service.ensure_session(_chat_id(callback), callback_thread_id(callback), callback.message.chat.title if callback.message else None)
         ready = game_service.accept_base_consent(_chat_id(callback), callback_thread_id(callback), callback.from_user.id)
     except GameError as exc:
-        await callback.answer(str(exc), show_alert=True)
+        await answer_callback(callback, str(exc), show_alert=True)
         return
     text = (
         "Подтверждение получено. Можно начинать."
@@ -124,7 +124,7 @@ async def cb_base_consent(callback: CallbackQuery, config: Config, game_service:
         text,
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("game:level:"))
@@ -140,7 +140,7 @@ async def cb_level(callback: CallbackQuery, config: Config, game_service: GameSe
         )
     else:
         await callback.message.answer("Выберите категорию:", reply_markup=category_menu(level, "light"))
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("game:intensity:"))
@@ -149,7 +149,7 @@ async def cb_intensity(callback: CallbackQuery, config: Config) -> None:
         return
     _, _, level, intensity = callback.data.split(":")
     await callback.message.answer("Выберите категорию:", reply_markup=category_menu(int(level), intensity))
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("game:category:"))
@@ -171,7 +171,7 @@ async def cb_category(callback: CallbackQuery, config: Config, game_service: Gam
             "Подходящих карточек не осталось или они не подходят под выбранный реквизит.",
             reply_markup=_level_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
         )
-        await callback.answer()
+        await answer_callback(callback)
         return
     except GameError as exc:
         await _show_game_error(callback, exc)
@@ -180,7 +180,7 @@ async def cb_category(callback: CallbackQuery, config: Config, game_service: Gam
         format_card(result.card),
         reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:roulette")
@@ -202,7 +202,7 @@ async def cb_roulette(callback: CallbackQuery, config: Config, game_service: Gam
             "Подходящих карточек не осталось или они не подходят под выбранный реквизит.",
             reply_markup=_level_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
         )
-        await callback.answer()
+        await answer_callback(callback)
         return
     except GameError as exc:
         await _show_game_error(callback, exc)
@@ -211,7 +211,7 @@ async def cb_roulette(callback: CallbackQuery, config: Config, game_service: Gam
         format_card(result.card),
         reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("game:roulette_level:"))
@@ -235,7 +235,7 @@ async def cb_roulette_level(callback: CallbackQuery, config: Config, game_servic
             "Подходящих карточек не осталось или они не подходят под выбранный реквизит.",
             reply_markup=_level_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
         )
-        await callback.answer()
+        await answer_callback(callback)
         return
     except GameError as exc:
         await _show_game_error(callback, exc)
@@ -244,7 +244,7 @@ async def cb_roulette_level(callback: CallbackQuery, config: Config, game_servic
         format_card(result.card),
         reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:done")
@@ -256,7 +256,7 @@ async def cb_done(callback: CallbackQuery, config: Config, game_service: GameSer
         f"Ход завершен. Следующий: {next_player}.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:skip")
@@ -271,7 +271,7 @@ async def cb_skip(callback: CallbackQuery, config: Config, game_service: GameSer
         f"Карточка пропущена без штрафа. Следующий: {next_player}.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("game:timer:"))
@@ -282,13 +282,13 @@ async def cb_timer(callback: CallbackQuery, config: Config, timer_service: Timer
     try:
         timer_id = timer_service.start_for_turn(turn_id, callback.from_user.id)
     except ValueError as exc:
-        await callback.answer(str(exc), show_alert=True)
+        await answer_callback(callback, str(exc), show_alert=True)
         return
     await callback.message.answer(
         f"Таймер запущен. ID: {timer_id}",
         reply_markup=card_actions(turn_id, False),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:reset:yes")
@@ -297,7 +297,7 @@ async def cb_reset_yes(callback: CallbackQuery, config: Config, game_service: Ga
         return
     game_service.reset_session(_chat_id(callback), callback_thread_id(callback))
     await callback.message.answer("Сессия завершена.", reply_markup=main_menu())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:reset:no")
@@ -308,7 +308,7 @@ async def cb_reset_no(callback: CallbackQuery, config: Config, game_service: Gam
         "Продолжаем.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "game:level4")
@@ -329,7 +329,7 @@ async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameS
             not was_enabled,
         )
     except GameError as exc:
-        await callback.answer(str(exc), show_alert=True)
+        await answer_callback(callback, str(exc), show_alert=True)
         return
     text = (
         "Уровень 4 включен."
@@ -341,7 +341,7 @@ async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameS
     await callback.message.edit_reply_markup(
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
     )
-    await callback.answer(text, show_alert=False)
+    await answer_callback(callback, text, show_alert=False)
 
 
 @router.callback_query(F.data == "game:hard")
@@ -362,7 +362,7 @@ async def cb_hard(callback: CallbackQuery, config: Config, game_service: GameSer
             not was_enabled,
         )
     except GameError as exc:
-        await callback.answer(str(exc), show_alert=True)
+        await answer_callback(callback, str(exc), show_alert=True)
         return
     text = (
         "Жесткий режим включен."
@@ -374,7 +374,7 @@ async def cb_hard(callback: CallbackQuery, config: Config, game_service: GameSer
     await callback.message.edit_reply_markup(
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
     )
-    await callback.answer(text, show_alert=False)
+    await answer_callback(callback, text, show_alert=False)
 
 
 @router.callback_query(F.data == "inv:menu")
@@ -392,7 +392,7 @@ async def cb_inventory(callback: CallbackQuery, config: Config, game_service: Ga
         "Настройте реквизит. Нажатие меняет частоту: выключен → редко → иногда → часто.",
         reply_markup=inventory_menu(game_service.available_items(), selected),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("inv:toggle:"))
@@ -413,7 +413,7 @@ async def cb_inventory_toggle(callback: CallbackQuery, config: Config, game_serv
     await callback.message.edit_reply_markup(
         reply_markup=inventory_menu(game_service.available_items(), selected)
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "inv:save")
@@ -429,7 +429,7 @@ async def cb_inventory_save(callback: CallbackQuery, config: Config, game_servic
         "Реквизит и частота выпадения сохранены для текущей сессии.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "boundaries:menu")
@@ -439,7 +439,7 @@ async def cb_boundaries(callback: CallbackQuery, config: Config, game_service: G
     selected = game_service.boundaries_for_active_session(_chat_id(callback), callback_thread_id(callback))
     BOUNDARY_SELECTIONS[_inventory_key(callback)] = set(selected)
     await callback.message.answer("Что сегодня точно исключаем?", reply_markup=boundary_menu(selected))
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("boundaries:toggle:"))
@@ -454,7 +454,7 @@ async def cb_boundaries_toggle(callback: CallbackQuery, config: Config) -> None:
     else:
         selected.add(code)
     await callback.message.edit_reply_markup(reply_markup=boundary_menu(selected))
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "boundaries:save")
@@ -472,4 +472,4 @@ async def cb_boundaries_save(callback: CallbackQuery, config: Config, game_servi
         "Границы сохранены.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
-    await callback.answer()
+    await answer_callback(callback)

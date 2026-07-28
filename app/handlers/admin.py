@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.config import Config
-from app.handlers.common import message_thread_id, reject_callback_if_not_admin, reject_callback_if_not_allowed, reject_if_not_allowed
+from app.handlers.common import answer_callback, message_thread_id, reject_callback_if_not_admin, reject_callback_if_not_allowed, reject_if_not_allowed
 from app.keyboards.admin import (
     admin_menu,
     admin_navigation,
@@ -98,7 +98,7 @@ async def cb_admin_menu(
         "Админка контента",
         reply_markup=_admin_menu(game_service, callback.message.chat.id, message_thread_id(callback.message)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "admin:home")
@@ -115,7 +115,7 @@ async def cb_admin_home(
         "Главное меню",
         reply_markup=_main_menu(game_service, callback.message.chat.id, message_thread_id(callback.message)),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "admin:add")
@@ -125,7 +125,7 @@ async def cb_admin_add(callback: CallbackQuery, config: Config, state: FSMContex
     await state.clear()
     await state.set_state(AdminAddCard.category)
     await callback.message.answer("Выберите тип карточки:", reply_markup=category_choice())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(AdminAddCard.category, F.data.startswith("admin:cat:"))
@@ -135,7 +135,7 @@ async def cb_admin_category(callback: CallbackQuery, config: Config, state: FSMC
     await state.update_data(category=callback.data.split(":")[-1])
     await state.set_state(AdminAddCard.level)
     await callback.message.answer("Выберите уровень:", reply_markup=level_choice())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(AdminAddCard.level, F.data.startswith("admin:level:"))
@@ -145,7 +145,7 @@ async def cb_admin_level(callback: CallbackQuery, config: Config, state: FSMCont
     await state.update_data(level=int(callback.data.split(":")[-1]))
     await state.set_state(AdminAddCard.intensity)
     await callback.message.answer("Выберите интенсивность:", reply_markup=intensity_choice())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(AdminAddCard.intensity, F.data.startswith("admin:intensity:"))
@@ -155,7 +155,7 @@ async def cb_admin_intensity(callback: CallbackQuery, config: Config, state: FSM
     await state.update_data(intensity=callback.data.split(":")[-1])
     await state.set_state(AdminAddCard.title)
     await callback.message.answer("Введите название карточки или '-' без названия.", reply_markup=admin_navigation())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.message(AdminAddCard.title)
@@ -295,7 +295,7 @@ async def cb_admin_save(callback: CallbackQuery, config: Config, state: FSMConte
     )
     await state.clear()
     await callback.message.answer(f"Карточка сохранена: {card_id}", reply_markup=admin_menu())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:list:"))
@@ -306,7 +306,7 @@ async def cb_admin_list(callback: CallbackQuery, config: Config, admin_service: 
     rows = admin_service.list_by_status(status, limit=8)
     if not rows:
         await callback.message.answer("Список пуст.", reply_markup=admin_menu())
-        await callback.answer()
+        await answer_callback(callback)
         return
     for row in rows:
         preview = row["text"][:80].replace("\n", " ")
@@ -314,7 +314,7 @@ async def cb_admin_list(callback: CallbackQuery, config: Config, admin_service: 
             f"#{row['id']} {row['level']}/{row['category']}/{row['intensity']} {row['review_status']}\n{preview}",
             reply_markup=card_manage(int(row["id"])),
         )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:approve:"))
@@ -324,7 +324,7 @@ async def cb_admin_approve(callback: CallbackQuery, config: Config, admin_servic
     card_id = int(callback.data.split(":")[-1])
     admin_service.approve_card(callback.from_user.id, card_id)
     await callback.message.answer(f"Карточка #{card_id} одобрена и включена.", reply_markup=admin_menu())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:disable:"))
@@ -334,7 +334,7 @@ async def cb_admin_disable(callback: CallbackQuery, config: Config, admin_servic
     card_id = int(callback.data.split(":")[-1])
     admin_service.disable_card(callback.from_user.id, card_id)
     await callback.message.answer(f"Карточка #{card_id} отключена.", reply_markup=admin_menu())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:duplicate:"))
@@ -345,7 +345,7 @@ async def cb_admin_duplicate(callback: CallbackQuery, config: Config, admin_serv
     external_id = f"copy_{card_id}_{int(callback.message.date.timestamp())}"
     new_id = admin_service.duplicate_card(callback.from_user.id, card_id, external_id)
     await callback.message.answer(f"Создан черновик-копия #{new_id}.", reply_markup=card_manage(new_id))
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:edit:"))
@@ -359,7 +359,7 @@ async def cb_admin_edit(callback: CallbackQuery, config: Config, state: FSMConte
         f"Введите новый текст для карточки #{card_id}. После правки она станет черновиком.",
         reply_markup=admin_navigation(),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.message(AdminAddCard.edit_text)
@@ -379,7 +379,7 @@ async def cb_admin_search(callback: CallbackQuery, config: Config, state: FSMCon
         return
     await state.set_state(AdminAddCard.search)
     await callback.message.answer("Введите ID, заголовок или фрагмент текста.", reply_markup=admin_navigation())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.message(AdminAddCard.search)
@@ -407,7 +407,7 @@ async def cb_admin_import(callback: CallbackQuery, config: Config, state: FSMCon
         "Отправьте CSV/XLSX/DOCX файлом. Сначала будет проверка без загрузки.",
         reply_markup=admin_navigation(),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.message(AdminAddCard.import_file)
@@ -441,7 +441,7 @@ async def cb_admin_import_confirm(callback: CallbackQuery, config: Config, state
     data = await state.get_data()
     import_path = data.get("import_path")
     if not import_path:
-        await callback.answer("Файл не найден", show_alert=True)
+        await answer_callback(callback, "Файл не найден", show_alert=True)
         return
     report = admin_service.import_content(callback.from_user.id, str(import_path), dry_run=False)
     await state.clear()
@@ -453,7 +453,7 @@ async def cb_admin_import_confirm(callback: CallbackQuery, config: Config, state
         f"warnings: {report.warnings_count}",
         reply_markup=admin_menu(),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "admin:export")
@@ -469,7 +469,7 @@ async def cb_admin_export(callback: CallbackQuery, config: Config, admin_service
         caption="Экспорт карточек (.xlsx)",
         reply_markup=admin_navigation(),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "admin:restricted")
@@ -483,7 +483,7 @@ async def cb_admin_restricted(
         return
     if not config.admin_content_password_sha256:
         await callback.message.answer("Пароль закрытого доступа не настроен на сервере.", reply_markup=admin_menu())
-        await callback.answer()
+        await answer_callback(callback)
         return
     game_service.ensure_session(
         callback.message.chat.id,
@@ -496,14 +496,14 @@ async def cb_admin_restricted(
         await callback.message.edit_reply_markup(
             reply_markup=_admin_menu(game_service, callback.message.chat.id, message_thread_id(callback.message))
         )
-        await callback.answer("Закрытые темы выключены.")
+        await answer_callback(callback, "Закрытые темы выключены.")
         return
     await state.set_state(AdminAddCard.restricted_password)
     await callback.message.answer(
         "Закрытые темы — это отдельные чувствительные карточки. Они не попадают в игру, пока вы не включите их паролем для текущей сессии.\n\nВведите админский пароль.",
         reply_markup=admin_navigation(),
     )
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.message(AdminAddCard.restricted_password)
@@ -549,14 +549,14 @@ async def cb_admin_collections(callback: CallbackQuery, config: Config, admin_se
     rows = admin_service.list_collections()
     if not rows:
         await callback.message.answer("Коллекций пока нет.", reply_markup=admin_menu())
-        await callback.answer()
+        await answer_callback(callback)
         return
     text = "\n".join(
         f"{row['code']} - {row['name']} - карточек: {row['cards_count']} - {'on' if row['is_enabled'] else 'off'}"
         for row in rows
     )
     await callback.message.answer(text, reply_markup=admin_menu())
-    await callback.answer()
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data == "admin:cancel")
@@ -565,4 +565,4 @@ async def cb_admin_cancel(callback: CallbackQuery, config: Config, state: FSMCon
         return
     await state.clear()
     await callback.message.answer("Отменено.", reply_markup=admin_menu())
-    await callback.answer()
+    await answer_callback(callback)

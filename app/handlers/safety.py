@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from app.config import Config
-from app.handlers.common import callback_thread_id, message_thread_id, reject_callback_if_not_allowed, reject_if_not_allowed
+from app.handlers.common import answer_callback, callback_thread_id, message_thread_id, reject_callback_if_not_allowed, reject_if_not_allowed
 from app.keyboards.game import main_menu
 from app.services.safety_service import SafetyService
 
@@ -29,8 +29,8 @@ async def cb_stopword(callback: CallbackQuery, config: Config, safety_service: S
     if await reject_callback_if_not_allowed(callback, config):
         return
     if not callback.message:
-        await callback.answer()
+        await answer_callback(callback)
         return
     safety_service.stopword(callback.message.chat.id, callback_thread_id(callback), callback.from_user.id)
     await callback.message.answer(STOPWORD_TEXT, reply_markup=main_menu())
-    await callback.answer()
+    await answer_callback(callback)
