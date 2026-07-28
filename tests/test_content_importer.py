@@ -55,7 +55,18 @@ def test_restricted_content_imports_into_closed_collection(tmp_path):
           AND c.is_enabled = 1
         """
     )
-    assert row["count"] == 18
+    assert row["count"] == 19
+    drafts = db.fetchall(
+        """
+        SELECT external_id, review_status, is_enabled
+        FROM cards
+        WHERE external_id LIKE 'restricted_l4_hard_%_progression_draft'
+           OR external_id = 'restricted_l4_hard_rope_restraint_draft'
+        ORDER BY external_id
+        """
+    )
+    assert len(drafts) == 3
+    assert all(row["review_status"] == "draft" and row["is_enabled"] == 0 for row in drafts)
     db.close()
 
 

@@ -72,7 +72,7 @@ def test_extreme_sheet_content_is_consistently_gated():
         newline="",
     ) as source:
         rows = list(csv.DictReader(source))
-    assert len(rows) == 18
+    assert len(rows) == 22
     for row in rows:
         assert row["level"] == "4"
         assert row["intensity"] == "hard"
@@ -80,6 +80,19 @@ def test_extreme_sheet_content_is_consistently_gated():
         assert row["requires_both_opt_in"] == "1"
         assert row["requires_safeword_check"] == "1"
         assert row["aftercare_required"] == "1"
+
+    active = [row for row in rows if row["review_status"] == "approved"]
+    drafts = [row for row in rows if row["review_status"] == "draft"]
+    assert len(active) == 19
+    assert all(row["is_enabled"] == "1" for row in active)
+    assert {
+        row["external_id"] for row in drafts
+    } == {
+        "restricted_l4_hard_fisting_progression_draft",
+        "restricted_l4_hard_urethral_progression_draft",
+        "restricted_l4_hard_rope_restraint_draft",
+    }
+    assert all(row["is_enabled"] == "0" for row in drafts)
 
 
 def test_extreme_cards_have_titles_and_actionable_structure():
@@ -91,10 +104,10 @@ def test_extreme_cards_have_titles_and_actionable_structure():
         rows = list(csv.DictReader(source))
 
     required_markers = {
-        "question": ("ответьте", "завершение:"),
-        "task": ("до начала:", "действие:", "завершение:"),
-        "pose": ("исходное положение:", "действие:", "завершение:"),
-        "desire": ("сейчас:", "использование:", "завершение:"),
+        "question": ("контекст:", "ответьте:", "итог:"),
+        "task": ("контекст:", "порядок:", "завершение:"),
+        "pose": ("исходное положение:", "назначение:", "действие:", "завершение:"),
+        "desire": ("контекст:", "сейчас:", "использование:", "завершение:"),
     }
     failures = []
     for row in rows:
@@ -103,6 +116,128 @@ def test_extreme_cards_have_titles_and_actionable_structure():
         if not row["title"].strip() or missing:
             failures.append((row["external_id"], row["title"], missing))
 
+    assert failures == []
+
+
+def test_every_card_has_one_complete_category_specific_structure():
+    required_markers = {
+        "question": ("Контекст:", "Ответьте:", "Итог:"),
+        "task": ("Контекст:", "Порядок:", "Завершение:"),
+        "pose": ("Исходное положение:", "Назначение:", "Действие:", "Завершение:"),
+        "desire": ("Контекст:", "Сейчас:", "Использование:", "Завершение:"),
+        "penalty": ("Контекст:", "Выполнение:", "Завершение:"),
+    }
+    failures = []
+    for row in _content_rows():
+        text = row["text"]
+        for marker in required_markers[row["category"]]:
+            count = text.count(marker)
+            if count != 1:
+                failures.append((row["external_id"], marker, count))
+    assert failures == []
+
+
+def test_user_editable_placeholders_are_disabled_restricted_drafts_only():
+    placeholder = "Пользователь исправит самостоятельно"
+    rows = [row for row in _content_rows() if placeholder in row["text"]]
+    assert {
+        row["external_id"] for row in rows
+    } == {
+        "restricted_l4_hard_fisting_progression_draft",
+        "restricted_l4_hard_urethral_progression_draft",
+        "restricted_l4_hard_rope_restraint_draft",
+    }
+    for row in rows:
+        assert row["collection"] == "restricted_content"
+        assert row["review_status"] == "draft"
+        assert row["is_enabled"] == "0"
+
+
+def test_active_cards_never_show_internal_placeholders():
+    failures = [
+        row["external_id"]
+        for row in _content_rows()
+        if row["is_enabled"] == "1"
+        and "пользователь исправит самостоятельно" in row["text"].casefold()
+    ]
+    assert failures == []
+
+
+def test_active_sex_and_bdsm_tasks_name_a_concrete_activity_or_explicitly_start_none():
+    concrete_fragments = (
+        "целу",
+        "куннилингус",
+        "оральн",
+        "ручн",
+        "вагинальн",
+        "анальн",
+        "влагалищ",
+        "ласка",
+        "массаж",
+        "реквизит",
+        "прикоснов",
+        "команд",
+        "положен",
+        "один шаг",
+        "шаг ближе",
+        "фистинг",
+        "не запуска",
+        "не начина",
+        "не выполня",
+        "провер",
+        "восстанов",
+    )
+    failures = []
+    for row in _content_rows():
+        if row["category"] != "task" or int(row["level"]) < 3:
+            continue
+        if row["review_status"] == "draft":
+            continue
+        text = row["text"].casefold()
+        if not any(fragment in text for fragment in concrete_fragments):
+            failures.append(row["external_id"])
+    assert failures == []
+
+
+def test_pose_starting_positions_do_not_use_open_ended_placeholders():
+    forbidden = (
+        "выберите одну устойчивую позу",
+        "выбирает удобную позу",
+        "ложится или садится удобно",
+        "располагается сверху или сбоку",
+        "располагается перед ним или сбоку",
+    )
+    failures = []
+    for row in _content_rows():
+        if row["category"] != "pose":
+            continue
+        text = row["text"].casefold()
+        matches = [fragment for fragment in forbidden if fragment in text]
+        if matches:
+            failures.append((row["external_id"], matches))
+    assert failures == []
+
+
+def test_previously_reported_contextless_phrases_do_not_return():
+    forbidden = (
+        "перед каждым новым действием",
+        "во время этой карточки любой партнер может",
+        "после сигнала таймера полностью остановитесь. каждый заканчивает",
+        "выберите одно место: кровать",
+        "короткую команду, которую хотел бы услышать",
+        "необходимый опыт",
+        "выполните согласованное действие",
+        "использует только заранее согласованные команды",
+        "новое действие из заранее разрешенного списка",
+        "выберите одну удобную позу",
+        "выберите удобную позу",
+    )
+    failures = []
+    for row in _content_rows():
+        text = row["text"].casefold()
+        matches = [fragment for fragment in forbidden if fragment in text]
+        if matches:
+            failures.append((row["external_id"], matches))
     assert failures == []
 
 

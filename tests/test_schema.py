@@ -23,7 +23,16 @@ def test_schema_loads(tmp_path):
     assert {"is_archived", "deleted_at"}.issubset(item_columns)
     assert {"item_mode", "is_archived", "deleted_at"}.issubset(card_columns)
     assert "frequency" in session_item_columns
+    cuffs = db.fetchone(
+        "SELECT name, min_level, max_level, randomizable FROM items WHERE code = 'soft_cuffs'"
+    )
+    assert dict(cuffs) == {
+        "name": "Мягкие манжеты",
+        "min_level": 4,
+        "max_level": 4,
+        "randomizable": 0,
+    }
     db.apply_migrations()
     applied = db.fetchone("SELECT COUNT(*) AS count FROM schema_migrations")
-    assert applied["count"] >= 6
+    assert applied["count"] >= 7
     db.close()
