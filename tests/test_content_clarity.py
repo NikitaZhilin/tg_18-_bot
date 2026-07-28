@@ -168,3 +168,27 @@ def test_builtin_titles_and_texts_are_not_duplicated():
             grouped.setdefault(row[field].strip().casefold(), []).append(row["external_id"])
         duplicates = [ids for value, ids in grouped.items() if value and len(ids) > 1]
         assert duplicates == []
+
+
+def test_explicit_card_durations_match_telegram_timers():
+    expected_timers = {
+        "task_l1_015": "60",
+        "task_l2_012": "120",
+        "task_l2_016": "60",
+        "task_l3_light_006": "60",
+        "task_l3_medium_006": "60",
+        "task_l4_light_001": "120",
+        "task_l4_medium_006": "60",
+        "task_l4_hard_009": "60",
+        "pose_ks_012": "30",
+        "pose_ks_016": "90",
+        "pose_ks_017": "90",
+        "pose_ks_020": "60",
+        "pose_ks_024": "90",
+    }
+    actual = {
+        row["external_id"]: row["timer_seconds"]
+        for row in _content_rows()
+        if row["external_id"] in expected_timers
+    }
+    assert actual == expected_timers
