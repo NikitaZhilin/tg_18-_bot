@@ -751,7 +751,7 @@ async def msg_admin_restricted_password(
     await state.clear()
     await message.answer(
         "Доступ к разделу «Экстрим» открыт для текущей сессии. "
-        "Для запуска также должны быть включены BDSM и жесткая интенсивность.",
+        "Кнопка «Экстрим» уже доступна в главном игровом меню.",
         reply_markup=_admin_menu(game_service, message.chat.id, message_thread_id(message)),
     )
 

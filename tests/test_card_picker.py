@@ -188,11 +188,6 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
 
-    service.set_level_4_consent(10, None, 111, True)
-    service.set_level_4_consent(10, None, 222, True)
-    service.set_hard_consent(10, None, 111, True)
-    service.set_hard_consent(10, None, 222, True)
-
     with pytest.raises(GameError, match="Экстрим"):
         service.draw_card(
             10,
@@ -213,6 +208,8 @@ def test_restricted_cards_require_session_unlock(tmp_path):
         collection_code="restricted_content",
     )
     assert result.card.external_id.startswith("restricted_")
+    assert result.card.level == 4
+    assert result.card.intensity == "hard"
     assert format_card(result.card).startswith("Экстрим ·")
     db.close()
 

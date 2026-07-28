@@ -80,3 +80,91 @@ def test_extreme_sheet_content_is_consistently_gated():
         assert row["requires_both_opt_in"] == "1"
         assert row["requires_safeword_check"] == "1"
         assert row["aftercare_required"] == "1"
+
+
+def test_extreme_cards_have_titles_and_actionable_structure():
+    with Path("content/restricted_cards.csv").open(
+        "r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as source:
+        rows = list(csv.DictReader(source))
+
+    required_markers = {
+        "question": ("ответьте", "завершение:"),
+        "task": ("до начала:", "действие:", "завершение:"),
+        "pose": ("исходное положение:", "действие:", "завершение:"),
+        "desire": ("сейчас:", "использование:", "завершение:"),
+    }
+    failures = []
+    for row in rows:
+        text = row["text"].casefold()
+        missing = [marker for marker in required_markers[row["category"]] if marker not in text]
+        if not row["title"].strip() or missing:
+            failures.append((row["external_id"], row["title"], missing))
+
+    assert failures == []
+
+
+def test_all_builtin_cards_have_clear_titles_and_substantial_text():
+    failures = []
+    for row in _content_rows():
+        if not row["title"].strip():
+            failures.append((row["external_id"], "нет названия"))
+        if len(row["text"].strip()) < 80:
+            failures.append((row["external_id"], "текст короче 80 символов"))
+    assert failures == []
+
+
+def test_all_poses_and_desires_explain_the_complete_flow():
+    failures = []
+    for row in _content_rows():
+        text = row["text"].casefold()
+        if row["category"] == "pose":
+            markers = ("исходное положение:", "действие:", "завершение:")
+        elif row["category"] == "desire":
+            markers = ("сейчас:", "использование:", "завершение:")
+        else:
+            continue
+        missing = [marker for marker in markers if marker not in text]
+        if missing:
+            failures.append((row["external_id"], missing))
+    assert failures == []
+
+
+def test_game_cards_do_not_send_players_into_admin_tools():
+    forbidden = (
+        "администратор",
+        "откройте «границы",
+        "открыть «границы",
+        "каталог карточек",
+        "без отдельного названия",
+        "в согласованных пределах",
+        "обязателен проверка",
+        "обязателен спокойное",
+    )
+    failures = []
+    for row in _content_rows():
+        text = row["text"].casefold()
+        matches = [fragment for fragment in forbidden if fragment in text]
+        if matches:
+            failures.append((row["external_id"], matches))
+    assert failures == []
+
+
+def test_optional_item_cards_explicitly_explain_random_prop():
+    failures = []
+    for row in _content_rows():
+        if row["item_mode"] == "optional" and "если бот указал реквизит" not in row["text"].casefold():
+            failures.append(row["external_id"])
+    assert failures == []
+
+
+def test_builtin_titles_and_texts_are_not_duplicated():
+    rows = _content_rows()
+    for field in ("title", "text"):
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(row[field].strip().casefold(), []).append(row["external_id"])
+        duplicates = [ids for value, ids in grouped.items() if value and len(ids) > 1]
+        assert duplicates == []

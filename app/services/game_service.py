@@ -265,8 +265,6 @@ class GameService:
             if collection_code == "restricted_content":
                 if not bool(session["allow_restricted_content"]):
                     raise GameError("Сначала откройте доступ к разделу «Экстрим» в админке")
-                if not bool(session["allow_level_4"]) or session["max_intensity"] != "hard":
-                    raise GameError("Для раздела «Экстрим» включите BDSM и жесткую интенсивность")
                 level = None
                 intensity = None
 
@@ -299,8 +297,8 @@ class GameService:
                     category=category,
                     intensity=intensity,
                     collection_code=collection_code,
-                    allow_level_4=bool(session["allow_level_4"]),
-                    max_intensity=picker_max_intensity,
+                    allow_level_4=True if collection_code == "restricted_content" else bool(session["allow_level_4"]),
+                    max_intensity="hard" if collection_code == "restricted_content" else picker_max_intensity,
                     allow_restricted_content=bool(session["allow_restricted_content"]),
                 ),
                 conn,
