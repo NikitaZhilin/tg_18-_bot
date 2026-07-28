@@ -13,6 +13,9 @@ router = Router(name="safety")
 
 
 STOPWORD_TEXT = "Игра остановлена. Сделайте паузу и обсудите, все ли в порядке."
+END_GAME_TEXT = (
+    "Игра завершена. Сегодня повторное подтверждение согласия не потребуется."
+)
 
 
 @router.message(Command("stopword"))
@@ -24,13 +27,13 @@ async def cmd_stopword(message: Message, config: Config, safety_service: SafetyS
     await message.answer(STOPWORD_TEXT, reply_markup=main_menu())
 
 
-@router.callback_query(F.data == "safe:stopword")
-async def cb_stopword(callback: CallbackQuery, config: Config, safety_service: SafetyService) -> None:
+@router.callback_query(F.data.in_({"safe:end_game", "safe:stopword"}))
+async def cb_end_game(callback: CallbackQuery, config: Config, safety_service: SafetyService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
     if not callback.message:
         await answer_callback(callback)
         return
     safety_service.stopword(callback.message.chat.id, callback_thread_id(callback), callback.from_user.id)
-    await callback.message.answer(STOPWORD_TEXT, reply_markup=main_menu())
+    await callback.message.answer(END_GAME_TEXT, reply_markup=main_menu())
     await answer_callback(callback)

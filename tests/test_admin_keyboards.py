@@ -39,17 +39,17 @@ def test_game_keyboards_have_main_menu_and_dynamic_modes():
     texts = [
         button.text
         for row in main_menu(
-            allow_level_4=True,
-            hard_enabled=True,
             restricted_enabled=True,
             enabled_levels=(3, 4),
         ).inline_keyboard
         for button in row
     ]
-    assert "Уровень 4: включен" in texts
-    assert "Жесткий режим: включен" in texts
+    assert not any(text.startswith("Уровень 4:") for text in texts)
+    assert not any(text.startswith("Жесткий режим:") for text in texts)
     assert "Экстрим" in texts
     assert any(text.startswith("Уровни по умолчанию: Секс, BDSM") for text in texts)
+    assert "game:level:4" in _callbacks(level_menu())
+    assert "game:intensity:4:hard" in _callbacks(intensity_menu(4))
 
 
 def test_inventory_keyboard_displays_frequency_and_menu_return():

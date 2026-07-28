@@ -13,11 +13,9 @@ LEVEL_LABELS = {
 
 def main_menu(
     *,
-    allow_level_4: bool = False,
-    hard_enabled: bool = False,
     has_active_turn: bool = False,
     restricted_enabled: bool = False,
-    enabled_levels: tuple[int, ...] = (1, 2, 3),
+    enabled_levels: tuple[int, ...] = (1, 2, 3, 4),
 ) -> InlineKeyboardMarkup:
     rows = []
     if has_active_turn:
@@ -35,20 +33,9 @@ def main_menu(
             ],
             [InlineKeyboardButton(text="Настроить реквизит", callback_data="inv:menu")],
             [InlineKeyboardButton(text="Границы на сегодня", callback_data="boundaries:menu")],
+            [InlineKeyboardButton(text="Сохраненные желания", callback_data="game:desires:0")],
             [InlineKeyboardButton(text="Админка", callback_data="admin:menu")],
-            [
-                InlineKeyboardButton(
-                    text=f"Уровень 4: {'включен' if allow_level_4 else 'выключен'}",
-                    callback_data="game:level4",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"Жесткий режим: {'включен' if hard_enabled else 'выключен'}",
-                    callback_data="game:hard",
-                )
-            ],
-            [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
+            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
         ]
     )
     if restricted_enabled:
@@ -61,24 +48,20 @@ def main_menu(
     )
 
 
-def consent_menu() -> InlineKeyboardMarkup:
+def consent_menu(player_name: str | None = None) -> InlineKeyboardMarkup:
+    button_text = f"Подтверждает {player_name}" if player_name else "Подтверждаю"
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Подтверждаю", callback_data="game:base_consent")],
+            [InlineKeyboardButton(text=button_text, callback_data="game:base_consent")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
         ]
     )
 
 
-def level_menu(*, allow_level_4: bool = False, restricted_enabled: bool = False) -> InlineKeyboardMarkup:
+def level_menu(*, restricted_enabled: bool = False) -> InlineKeyboardMarkup:
     level_rows = []
     for level, label in LEVEL_LABELS.items():
-        if level == 4 and not allow_level_4:
-            level_rows.append(
-                [InlineKeyboardButton(text=f"{label} (выключен)", callback_data="game:level4")]
-            )
-        else:
-            level_rows.append([InlineKeyboardButton(text=label, callback_data=f"game:level:{level}")])
+        level_rows.append([InlineKeyboardButton(text=label, callback_data=f"game:level:{level}")])
     extra_rows = []
     if restricted_enabled:
         extra_rows.append([InlineKeyboardButton(text="Экстрим", callback_data="game:extreme")])
@@ -86,27 +69,23 @@ def level_menu(*, allow_level_4: bool = False, restricted_enabled: bool = False)
         inline_keyboard=level_rows + extra_rows + [
             [InlineKeyboardButton(text="Рулетка без выбора уровня", callback_data="game:roulette")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
-            [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
+            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
         ],
     )
 
 
-def intensity_menu(level: int, *, hard_enabled: bool = False) -> InlineKeyboardMarkup:
-    hard_button = InlineKeyboardButton(
-        text="Жесткие" if hard_enabled else "Жесткие (выключены)",
-        callback_data=f"game:intensity:{level}:hard" if hard_enabled else "game:hard",
-    )
+def intensity_menu(level: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Легкие", callback_data=f"game:intensity:{level}:light"),
                 InlineKeyboardButton(text="Средние", callback_data=f"game:intensity:{level}:medium"),
-                hard_button,
+                InlineKeyboardButton(text="Жесткие", callback_data=f"game:intensity:{level}:hard"),
             ],
             [InlineKeyboardButton(text="Рулетка уровня", callback_data=f"game:roulette_level:{level}:any")],
             [InlineKeyboardButton(text="К уровням", callback_data="game:menu")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
-            [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
+            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
         ]
     )
 
@@ -125,7 +104,7 @@ def category_menu(level: int, intensity: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Рулетка уровня", callback_data=f"game:roulette_level:{level}:{intensity}")],
             [InlineKeyboardButton(text="К уровням", callback_data="game:menu")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
-            [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
+            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
         ]
     )
 
@@ -140,7 +119,13 @@ def card_actions(turn_id: int, has_timer: bool) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Готово", callback_data="game:done"),
                 InlineKeyboardButton(text="Заменить карточку", callback_data="game:replace"),
             ],
-            [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
+            [
+                InlineKeyboardButton(
+                    text="Сообщить о непонятной карточке",
+                    callback_data=f"game:report_unclear:{turn_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
         ]
     )
@@ -149,22 +134,16 @@ def card_actions(turn_id: int, has_timer: bool) -> InlineKeyboardMarkup:
 
 def default_levels_menu(
     selected: tuple[int, ...],
-    *,
-    allow_level_4: bool = False,
 ) -> InlineKeyboardMarkup:
     selected_set = set(selected)
     rows = []
     for level, label in LEVEL_LABELS.items():
-        if level == 4 and not allow_level_4:
-            text = f"{label}: недоступен"
-            callback_data = "game:level4"
-        else:
-            mark = "✓ " if level in selected_set else ""
-            text = f"{mark}{label}"
-            callback_data = f"game:default_level:{level}"
+        mark = "✓ " if level in selected_set else ""
+        text = f"{mark}{label}"
+        callback_data = f"game:default_level:{level}"
         rows.append([InlineKeyboardButton(text=text, callback_data=callback_data)])
     rows.append([InlineKeyboardButton(text="Готово", callback_data="game:home")])
-    rows.append([InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")])
+    rows.append([InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -199,5 +178,5 @@ def boundary_menu(selected: set[str] | None = None) -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton(text=f"{mark}{label}", callback_data=f"boundaries:toggle:{code}")])
     rows.append([InlineKeyboardButton(text="Сохранить", callback_data="boundaries:save")])
     rows.append([InlineKeyboardButton(text="В меню", callback_data="game:home")])
-    rows.append([InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")])
+    rows.append([InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

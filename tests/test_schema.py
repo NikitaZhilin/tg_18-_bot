@@ -9,6 +9,16 @@ def test_schema_loads(tmp_path):
     assert row["name"] == "cards"
     row = db.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_actions'")
     assert row["name"] == "admin_actions"
+    row = db.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='fsm_states'")
+    assert row["name"] == "fsm_states"
+    row = db.fetchone(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='session_setting_drafts'"
+    )
+    assert row["name"] == "session_setting_drafts"
+    row = db.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='seed_conflicts'")
+    assert row["name"] == "seed_conflicts"
+    row = db.fetchone("SELECT name FROM sqlite_master WHERE type='table' AND name='card_feedback'")
+    assert row["name"] == "card_feedback"
     session_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(sessions)")}
     turn_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(turns)")}
     item_columns = {row["name"] for row in db.fetchall("PRAGMA table_info(items)")}
@@ -34,5 +44,5 @@ def test_schema_loads(tmp_path):
     }
     db.apply_migrations()
     applied = db.fetchone("SELECT COUNT(*) AS count FROM schema_migrations")
-    assert applied["count"] >= 7
+    assert applied["count"] >= 15
     db.close()

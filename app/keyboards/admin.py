@@ -24,6 +24,8 @@ def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarku
             [InlineKeyboardButton(text="Добавить карточку", callback_data="admin:add")],
             [InlineKeyboardButton(text="Каталог карточек", callback_data="admin:catalog")],
             [InlineKeyboardButton(text="Каталог реквизита", callback_data="admin:items:0")],
+            [InlineKeyboardButton(text="Непонятные карточки", callback_data="admin:feedback")],
+            [InlineKeyboardButton(text="Конфликты обновлений", callback_data="admin:conflicts")],
             [InlineKeyboardButton(text="Импорт XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Экспорт XLSX", callback_data="admin:export")],
             [
@@ -141,8 +143,111 @@ def card_manage(
                 ),
                 InlineKeyboardButton(text="Удалить", callback_data=f"admin:deleteask:{card_id}"),
             ],
+            [InlineKeyboardButton(text="История версий", callback_data=f"admin:versions:{card_id}")],
             [InlineKeyboardButton(text="Назад к списку", callback_data=back_callback)],
             [InlineKeyboardButton(text="В админку", callback_data="admin:menu")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def card_versions(rows, card_id: int) -> InlineKeyboardMarkup:
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=(
+                    f"Версия {row['version_number']} · "
+                    f"{row['change_reason'] or 'изменение'} · {row['created_at']}"
+                ),
+                callback_data=f"admin:version:{card_id}:{row['id']}",
+            )
+        ]
+        for row in rows
+    ]
+    buttons.append([InlineKeyboardButton(text="К карточке", callback_data=f"admin:card_simple:{card_id}")])
+    buttons.append([InlineKeyboardButton(text="В админку", callback_data="admin:menu")])
+    buttons.append([InlineKeyboardButton(text="Главное меню", callback_data="admin:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def card_version_manage(card_id: int, version_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Восстановить эту версию",
+                    callback_data=f"admin:restore_version:{card_id}:{version_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="К истории", callback_data=f"admin:versions:{card_id}")],
+            [InlineKeyboardButton(text="К карточке", callback_data=f"admin:card_simple:{card_id}")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def seed_conflicts(rows) -> InlineKeyboardMarkup:
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"{row['external_id']} · {row['content_version']}",
+                callback_data=f"admin:conflict:{row['id']}",
+            )
+        ]
+        for row in rows
+    ]
+    buttons.append([InlineKeyboardButton(text="В админку", callback_data="admin:menu")])
+    buttons.append([InlineKeyboardButton(text="Главное меню", callback_data="admin:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def seed_conflict_choice(conflict_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Оставить мою версию",
+                    callback_data=f"admin:resolve_conflict:{conflict_id}:keep",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Применить встроенную",
+                    callback_data=f"admin:resolve_conflict:{conflict_id}:apply",
+                )
+            ],
+            [InlineKeyboardButton(text="К конфликтам", callback_data="admin:conflicts")],
+            [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
+        ]
+    )
+
+
+def card_feedback_list(rows) -> InlineKeyboardMarkup:
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"{row['external_id'] or '#' + str(row['card_id'])} · {row['created_at']}",
+                callback_data=f"admin:feedback_item:{row['id']}",
+            )
+        ]
+        for row in rows
+    ]
+    buttons.append([InlineKeyboardButton(text="В админку", callback_data="admin:menu")])
+    buttons.append([InlineKeyboardButton(text="Главное меню", callback_data="admin:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def card_feedback_actions(feedback_id: int, card_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Открыть карточку", callback_data=f"admin:card_simple:{card_id}")],
+            [
+                InlineKeyboardButton(
+                    text="Отметить обработанным",
+                    callback_data=f"admin:feedback_resolve:{feedback_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="К сообщениям", callback_data="admin:feedback")],
             [InlineKeyboardButton(text="Главное меню", callback_data="admin:home")],
         ]
     )

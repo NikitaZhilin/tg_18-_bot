@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.services.game_service import GameService
 from app.services.safety_service import SafetyService
 from app.services.timer_service import TimerService
-from tests.helpers import import_seed, make_config, migrated_db
+from tests.helpers import import_seed, make_config, make_single_account_config, migrated_db
 
 
 def enable_one_timed_card(db) -> None:
@@ -55,4 +55,33 @@ def test_manual_reset_stops_turn_and_cancels_timer(tmp_path):
     assert session["status"] == "reset"
     assert turn["status"] == "stopped"
     assert timer["status"] == "cancelled"
+    db.close()
+
+
+def test_single_account_consent_is_reused_for_new_session_on_same_day(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    config = make_single_account_config(tmp_path)
+    game = GameService(db, config)
+    game.ensure_session(10, None)
+    assert game.accept_base_consent(10, None, 111) is False
+    assert game.accept_base_consent(10, None, 111) is True
+
+    safety = SafetyService(db)
+    assert safety.stopword(10, None, 111) is True
+
+    game.ensure_session(10, None)
+    assert game.has_base_consent(10, None) is True
+    active = game.active_session(10, None)
+    assert active is not None
+    assert db.fetchone(
+        """
+        SELECT COUNT(*) AS count
+        FROM session_consents
+        WHERE session_id = ?
+          AND consent_type IN ('base_game:player_1', 'base_game:player_2')
+          AND accepted = 1
+        """,
+        (active["id"],),
+    )["count"] == 2
     db.close()

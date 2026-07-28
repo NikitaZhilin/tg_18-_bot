@@ -34,6 +34,7 @@ def test_due_timer_sends_telegram_message(tmp_path):
         sent.append((chat_id, text, thread_id))
 
     asyncio.run(timer_service.process_due_timers(notify))
+    asyncio.run(timer_service.process_due_timers(notify))
 
     timer = db.fetchone("SELECT * FROM timers WHERE id = ?", (timer_id,))
     assert sent == [(10, "Время вышло.", 77)]
@@ -55,16 +56,46 @@ def test_failed_timer_notification_is_retried_later(tmp_path):
     timer_id = timer_service.start_for_turn(result.turn_id, 111)
     db.execute("UPDATE timers SET deadline_at = ? WHERE id = ?", ("2000-01-01T00:00:00+00:00", timer_id))
 
+    attempts = 0
+
     async def failed_notify(chat_id: int, text: str, thread_id: int | None) -> None:
+        nonlocal attempts
+        attempts += 1
         raise RuntimeError("temporary Telegram error")
 
-    try:
-        asyncio.run(timer_service.process_due_timers(failed_notify))
-    except RuntimeError:
-        pass
+    asyncio.run(timer_service.process_due_timers(failed_notify))
 
-    timer = db.fetchone("SELECT status, notified_at FROM timers WHERE id = ?", (timer_id,))
+    timer = db.fetchone(
+        """
+        SELECT status, notified_at, attempt_count, next_attempt_at, last_error
+        FROM timers
+        WHERE id = ?
+        """,
+        (timer_id,),
+    )
     assert timer["status"] == "active"
+    assert timer["notified_at"] is None
+    assert timer["attempt_count"] == 1
+    assert timer["next_attempt_at"] is not None
+    assert "temporary Telegram error" in timer["last_error"]
+
+    asyncio.run(timer_service.process_due_timers(failed_notify))
+    assert attempts == 1
+
+    for _ in range(4):
+        db.execute(
+            "UPDATE timers SET next_attempt_at = ? WHERE id = ?",
+            ("2000-01-01T00:00:00+00:00", timer_id),
+        )
+        asyncio.run(timer_service.process_due_timers(failed_notify))
+
+    timer = db.fetchone(
+        "SELECT status, attempt_count, notified_at FROM timers WHERE id = ?",
+        (timer_id,),
+    )
+    assert attempts == 5
+    assert timer["status"] == "expired"
+    assert timer["attempt_count"] == 5
     assert timer["notified_at"] is None
     db.close()
 

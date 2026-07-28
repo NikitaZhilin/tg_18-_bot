@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
 from app.storage.repositories.cards import CardRepository
 from tests.helpers import import_restricted_seed, import_seed, migrated_db
@@ -82,6 +83,15 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
         WHERE external_id = 'task_l1_001'
         """
     )
+    second_card = db.fetchone("SELECT id FROM cards WHERE external_id = 'task_l1_002'")
+    CardRepository(db).save_version(int(second_card["id"]), None, "admin_edit")
+    db.execute(
+        """
+        UPDATE cards
+        SET text = 'Вторая локальная версия'
+        WHERE external_id = 'task_l1_002'
+        """
+    )
 
     report = ContentImporter(db).import_file(
         Path("content/cards.csv"),
@@ -91,7 +101,38 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
 
     card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
     assert card["text"] == "Текст, измененный администратором"
-    assert report.added_or_updated == 195
+    assert report.added_or_updated == 194
+    assert report.conflicts == 2
+    conflict = db.fetchone(
+        "SELECT id, status FROM seed_conflicts WHERE external_id = 'task_l1_001'"
+    )
+    assert conflict["status"] == "pending"
+
+    db.execute(
+        "INSERT INTO users (telegram_id, display_name, role) VALUES (111, 'Админ', 'player_1')"
+    )
+    AdminService(db).resolve_seed_conflict(111, int(conflict["id"]), apply_seed=True)
+    restored = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
+    assert restored["text"] != "Текст, измененный администратором"
+    assert db.fetchone(
+        "SELECT status FROM seed_conflicts WHERE id = ?",
+        (conflict["id"],),
+    )["status"] == "apply_seed"
+    keep_conflict = db.fetchone(
+        "SELECT id FROM seed_conflicts WHERE external_id = 'task_l1_002'"
+    )
+    AdminService(db).resolve_seed_conflict(
+        111,
+        int(keep_conflict["id"]),
+        apply_seed=False,
+    )
+    assert db.fetchone(
+        "SELECT text FROM cards WHERE external_id = 'task_l1_002'"
+    )["text"] == "Вторая локальная версия"
+    assert db.fetchone(
+        "SELECT status FROM seed_conflicts WHERE id = ?",
+        (keep_conflict["id"],),
+    )["status"] == "keep_local"
     db.close()
 
 

@@ -31,13 +31,13 @@ space_required
 body_load
 required_items
 timer_seconds
-safety_level
 risk_tags
-requires_both_opt_in
-requires_safeword_check
+avoid_if_tags
 aftercare_required
 review_status
 is_enabled
+item_mode
+collection
 notes
 ```
 
@@ -95,13 +95,15 @@ is_enabled = 0
 
 Включать в игру только после ручного просмотра.
 
-Для `level = 4` или `intensity = hard`:
+Для карточек, которым нужно отдельное завершение:
 
 ```text
-requires_both_opt_in = 1
-requires_safeword_check = 1
 aftercare_required = 1
 ```
+
+Удаленные поля `safety_level`, `requires_both_opt_in` и `requires_safeword_check` в импорте
+не используются. Согласие обоих игроков подтверждается один раз в сутки до начала игры,
+а доступ к коллекции `restricted_content` управляется отдельно в админке.
 
 ## Что не включено
 

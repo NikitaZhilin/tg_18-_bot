@@ -10,14 +10,29 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 
 from app.config import Config
-from app.handlers import admin, admin_cards, admin_items, game, safety, start, status
+from app.handlers import (
+    admin,
+    admin_cards,
+    admin_items,
+    admin_operations,
+    desires,
+    feedback,
+    game,
+    game_settings,
+    safety,
+    start,
+    status,
+)
 from app.logging_config import configure_logging
 from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
+from app.services.desire_service import DesireService
 from app.services.game_service import GameService
+from app.services.feedback_service import FeedbackService
 from app.services.safety_service import SafetyService
 from app.services.timer_service import TimerService
 from app.storage import Database
+from app.storage.fsm import SQLiteFSMStorage
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +45,8 @@ def build_services(config: Config) -> tuple[Database, dict[str, object]]:
         "config": config,
         "db": db,
         "game_service": GameService(db, config),
+        "desire_service": DesireService(db, config),
+        "feedback_service": FeedbackService(db),
         "safety_service": SafetyService(db),
         "timer_service": TimerService(db),
         "admin_service": AdminService(db),
@@ -38,13 +55,19 @@ def build_services(config: Config) -> tuple[Database, dict[str, object]]:
 
 
 def build_dispatcher(services: dict[str, object]) -> Dispatcher:
-    dp = Dispatcher(**services)
+    db = services["db"]
+    assert isinstance(db, Database)
+    dp = Dispatcher(storage=SQLiteFSMStorage(db), **services)
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)
     dp.include_router(admin_cards.router)
     dp.include_router(admin_items.router)
+    dp.include_router(admin_operations.router)
     dp.include_router(admin.router)
+    dp.include_router(desires.router)
+    dp.include_router(feedback.router)
+    dp.include_router(game_settings.router)
     dp.include_router(game.router)
     return dp
 

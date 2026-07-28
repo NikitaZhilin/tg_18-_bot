@@ -50,7 +50,6 @@ class Config:
     log_level: str
     dry_run: bool
     allow_unlisted_users: bool
-    allow_level_4_default: bool
     single_account_two_players: bool
     admin_content_password_sha256: str | None
     telegram_proxy_url: str | None
@@ -76,7 +75,6 @@ class Config:
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             dry_run=_parse_bool(os.getenv("DRY_RUN"), False),
             allow_unlisted_users=_parse_bool(os.getenv("ALLOW_UNLISTED_USERS"), False),
-            allow_level_4_default=_parse_bool(os.getenv("ALLOW_LEVEL_4_DEFAULT"), False),
             single_account_two_players=_parse_bool(os.getenv("SINGLE_ACCOUNT_TWO_PLAYERS"), False),
             admin_content_password_sha256=(os.getenv("ADMIN_CONTENT_PASSWORD_SHA256") or "").strip() or None,
             telegram_proxy_url=os.getenv("TELEGRAM_PROXY_URL") or None,

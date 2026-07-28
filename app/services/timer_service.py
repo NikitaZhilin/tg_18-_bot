@@ -49,13 +49,30 @@ class TimerService:
         self,
         notify: Callable[[int, str, int | None], Awaitable[None]],
     ) -> None:
-        for timer in self.timers.due():
-            session = self.db.fetchone("SELECT chat_key FROM sessions WHERE id = ?", (timer["session_id"],))
-            if session:
+        for timer in self.timers.claim_due():
+            token = str(timer["claim_token"])
+            try:
+                session = self.db.fetchone(
+                    "SELECT chat_key FROM sessions WHERE id = ?",
+                    (timer["session_id"],),
+                )
+                if not session:
+                    raise RuntimeError("timer session not found")
                 chat_raw, thread_raw = str(session["chat_key"]).split(":", 1)
                 thread_id = int(thread_raw) or None
                 await notify(int(chat_raw), "Время вышло.", thread_id)
-                self.timers.mark_completed(int(timer["id"]))
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.timers.mark_failed(int(timer["id"]), token, str(exc))
+                logger.warning(
+                    "timer notification failed: timer_id=%s attempt=%s error=%s",
+                    timer["id"],
+                    timer["attempt_count"],
+                    exc,
+                )
+                continue
+            self.timers.mark_completed(int(timer["id"]), token)
 
     async def run_due_loop(
         self,

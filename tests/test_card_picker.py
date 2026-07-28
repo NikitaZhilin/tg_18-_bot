@@ -23,17 +23,13 @@ def test_draws_only_approved_cards_and_prevents_repeats(tmp_path):
     db.close()
 
 
-def test_hard_requires_consent_and_has_reviewed_seed_cards(tmp_path):
+def test_hard_cards_are_available_without_duplicate_mode_toggle(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
     service = GameService(db, make_config(tmp_path))
     service.ensure_session(10, None)
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
-    with pytest.raises(GameError):
-        service.draw_card(10, None, 111, level=3, category="task", intensity="hard")
-    service.set_hard_consent(10, None, 111, True)
-    service.set_hard_consent(10, None, 222, True)
     result = service.draw_card(10, None, 111, level=3, category="task", intensity="hard")
     assert result.card.intensity == "hard"
     db.close()
@@ -46,6 +42,10 @@ def test_base_consent_required_before_draw(tmp_path):
     service.ensure_session(10, None)
     with pytest.raises(GameError):
         service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    with pytest.raises(GameError, match="Сейчас подтверждает A"):
+        service.accept_base_consent(10, None, 222)
+    assert service.accept_base_consent(10, None, 111) is False
+    assert service.accept_base_consent(10, None, 222) is True
     db.close()
 
 
@@ -63,33 +63,15 @@ def test_session_boundaries_filter_cards(tmp_path):
     db.close()
 
 
-def test_level4_requires_two_consents(tmp_path):
+def test_bdsm_level_is_available_without_duplicate_level_toggle(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
     service = GameService(db, make_config(tmp_path))
     service.ensure_session(10, None)
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
-    with pytest.raises(GameError):
-        service.draw_card(10, None, 111, level=4, category="task", intensity="light")
-    assert service.set_level_4_consent(10, None, 111, True) is False
-    assert service.set_level_4_consent(10, None, 222, True) is True
     result = service.draw_card(10, None, 111, level=4, category="task", intensity="light")
     assert result.card.level == 4
-    db.close()
-
-
-def test_hard_consent_records_safety_event(tmp_path):
-    db = migrated_db(tmp_path)
-    import_seed(db)
-    service = GameService(db, make_config(tmp_path))
-    service.ensure_session(10, None)
-    service.accept_base_consent(10, None, 111)
-    service.accept_base_consent(10, None, 222)
-    service.set_hard_consent(10, None, 111, True)
-    service.set_hard_consent(10, None, 222, True)
-    event = db.fetchone("SELECT * FROM safety_events WHERE event_type = 'hard_enabled'")
-    assert event is not None
     db.close()
 
 
@@ -104,6 +86,8 @@ def test_desire_card_is_saved_as_coupon(tmp_path):
     saved = db.fetchone("SELECT * FROM saved_desires WHERE card_id = ?", (result.card.id,))
     assert saved is not None
     assert saved["owner_id"] == 111
+    assert saved["owner_slot"] == "player_1"
+    assert saved["granted_by_slot"] == "player_2"
     db.close()
 
 
@@ -112,6 +96,7 @@ def test_single_account_mode_uses_virtual_player_slots(tmp_path):
     import_seed(db)
     service = GameService(db, make_single_account_config(tmp_path))
     service.ensure_session(10, None)
+    assert service.accept_base_consent(10, None, 111) is False
     assert service.accept_base_consent(10, None, 111) is True
 
     first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
@@ -262,10 +247,6 @@ def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
     service.ensure_session(10, None)
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
-    service.set_level_4_consent(10, None, 111, True)
-    service.set_level_4_consent(10, None, 222, True)
-    service.set_hard_consent(10, None, 111, True)
-    service.set_hard_consent(10, None, 222, True)
     service.unlock_restricted_content(10, None)
     service.set_items_for_active_session(10, None, {"gloves": 3, "lubricant": 1})
 
@@ -317,6 +298,29 @@ def test_replace_card_keeps_player_and_filters_but_draws_another_card(tmp_path):
     db.close()
 
 
+def test_replace_keeps_current_card_when_no_replacement_exists(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute("UPDATE cards SET is_enabled = 1 WHERE external_id = 'task_l1_001'")
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    with pytest.raises(NoCardsAvailable):
+        service.replace_active_card(10, None, 111)
+
+    current = service.current_card(10, None)
+    assert current is not None
+    assert current.turn_id == first.turn_id
+    assert current.card.id == first.card.id
+    turn = db.fetchone("SELECT status FROM turns WHERE id = ?", (first.turn_id,))
+    assert turn["status"] == "active"
+    db.close()
+
+
 def test_roulette_uses_session_default_levels(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
@@ -336,25 +340,6 @@ def test_roulette_uses_session_default_levels(tmp_path):
         source="roulette",
     )
 
-    assert service.enabled_levels(10, None) == (3,)
-    assert result.card.level == 3
-    db.close()
-
-
-def test_level4_and_hard_can_be_disabled_again(tmp_path):
-    db = migrated_db(tmp_path)
-    import_seed(db)
-    service = GameService(db, make_single_account_config(tmp_path))
-    service.ensure_session(10, None)
-
-    assert service.set_level_4_consent(10, None, 111, True) is True
-    assert service.set_hard_consent(10, None, 111, True) is True
-    service.set_level_4_consent(10, None, 111, False)
-    service.set_hard_consent(10, None, 111, False)
-    status = service.status(10, None)
-
-    assert status["allow_level_4"] is False
-    assert status["max_intensity"] == "medium"
-    event_types = {row["event_type"] for row in db.fetchall("SELECT event_type FROM safety_events")}
-    assert {"level_4_disabled", "hard_disabled"}.issubset(event_types)
+    assert service.enabled_levels(10, None) == (3, 4)
+    assert result.card.level in {3, 4}
     db.close()

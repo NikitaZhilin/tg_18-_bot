@@ -35,6 +35,20 @@ def test_card_catalog_archives_and_soft_deletes_without_breaking_history(tmp_pat
         "SELECT COUNT(*) AS count FROM card_versions WHERE card_id = ?",
         (card_id,),
     )["count"] == 3
+
+    first_version = db.fetchone(
+        """
+        SELECT id
+        FROM card_versions
+        WHERE card_id = ? AND version_number = 1
+        """,
+        (card_id,),
+    )
+    service.restore_card_version(111, card_id, int(first_version["id"]))
+    restored = service.get_card(card_id)
+    assert restored["deleted_at"] is None
+    assert restored["is_archived"] == 0
+    assert restored["is_enabled"] == 1
     db.close()
 
 

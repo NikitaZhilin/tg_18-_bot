@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import sqlite3
-from typing import Iterable
+from typing import Any, Iterable
 
 from app.storage import Database
 
@@ -45,16 +46,15 @@ class SessionRepository:
         player_1_id: int,
         player_2_id: int,
         current_player_id: int,
-        allow_level_4: bool = False,
         current_player_slot: str = "player_1",
     ) -> int:
         cur = self.db.execute(
             """
             INSERT INTO sessions (
                 chat_key, player_1_id, player_2_id, current_player_id,
-                current_player_slot, allow_level_4, updated_at
+                current_player_slot, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
             (
                 chat_key,
@@ -62,13 +62,12 @@ class SessionRepository:
                 player_2_id,
                 current_player_id,
                 current_player_slot,
-                1 if allow_level_4 else 0,
             ),
         )
         session_id = int(cur.lastrowid)
         self.db.executemany(
             "INSERT OR IGNORE INTO session_enabled_levels (session_id, level) VALUES (?, ?)",
-            [(session_id, 1), (session_id, 2), (session_id, 3)],
+            [(session_id, 1), (session_id, 2), (session_id, 3), (session_id, 4)],
         )
         return session_id
 
@@ -83,6 +82,59 @@ class SessionRepository:
                     """,
                     (session_id, code, max(1, min(3, int(frequency)))),
                 )
+
+    def get_setting_draft(
+        self,
+        session_id: int,
+        user_id: int,
+        draft_type: str,
+    ) -> dict[str, Any] | list[Any] | None:
+        row = self.db.fetchone(
+            """
+            SELECT data_json
+            FROM session_setting_drafts
+            WHERE session_id = ? AND user_id = ? AND draft_type = ?
+            """,
+            (session_id, user_id, draft_type),
+        )
+        if not row:
+            return None
+        data = json.loads(str(row["data_json"]))
+        return data if isinstance(data, (dict, list)) else None
+
+    def set_setting_draft(
+        self,
+        session_id: int,
+        user_id: int,
+        draft_type: str,
+        data: dict[str, Any] | list[Any],
+    ) -> None:
+        self.db.execute(
+            """
+            INSERT INTO session_setting_drafts (
+                session_id, user_id, draft_type, data_json
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(session_id, user_id, draft_type) DO UPDATE SET
+                data_json = excluded.data_json,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                session_id,
+                user_id,
+                draft_type,
+                json.dumps(data, ensure_ascii=False, separators=(",", ":")),
+            ),
+        )
+
+    def delete_setting_draft(self, session_id: int, user_id: int, draft_type: str) -> None:
+        self.db.execute(
+            """
+            DELETE FROM session_setting_drafts
+            WHERE session_id = ? AND user_id = ? AND draft_type = ?
+            """,
+            (session_id, user_id, draft_type),
+        )
 
     def set_blocked_tags(self, session_id: int, tags: Iterable[str]) -> None:
         with self.db.transaction() as conn:
@@ -116,17 +168,76 @@ class SessionRepository:
         )
         return int(row["count"])
 
-    def set_level_4(self, session_id: int, enabled: bool) -> None:
+    def add_daily_consent(self, chat_key: str, user_id: int, consent_date: str) -> None:
         self.db.execute(
-            "UPDATE sessions SET allow_level_4 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (1 if enabled else 0, session_id),
+            """
+            INSERT INTO daily_consents (chat_key, user_id, consent_date)
+            VALUES (?, ?, ?)
+            ON CONFLICT(chat_key, user_id, consent_date) DO UPDATE SET
+                accepted_at = CURRENT_TIMESTAMP
+            """,
+            (chat_key, user_id, consent_date),
         )
 
-    def set_max_intensity(self, session_id: int, intensity: str) -> None:
+    def daily_consent_user_ids(self, chat_key: str, consent_date: str) -> set[int]:
+        return {
+            int(row["user_id"])
+            for row in self.db.fetchall(
+                """
+                SELECT user_id
+                FROM daily_consents
+                WHERE chat_key = ? AND consent_date = ?
+                """,
+                (chat_key, consent_date),
+            )
+        }
+
+    def add_daily_slot_consent(
+        self,
+        chat_key: str,
+        player_slot: str,
+        user_id: int,
+        consent_date: str,
+    ) -> None:
         self.db.execute(
-            "UPDATE sessions SET max_intensity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (intensity, session_id),
+            """
+            INSERT INTO daily_slot_consents (
+                chat_key, player_slot, user_id, consent_date
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(chat_key, player_slot, consent_date) DO UPDATE SET
+                user_id = excluded.user_id,
+                accepted_at = CURRENT_TIMESTAMP
+            """,
+            (chat_key, player_slot, user_id, consent_date),
         )
+
+    def daily_slot_consents(self, chat_key: str, consent_date: str) -> list[sqlite3.Row]:
+        return self.db.fetchall(
+            """
+            SELECT player_slot, user_id
+            FROM daily_slot_consents
+            WHERE chat_key = ? AND consent_date = ?
+            ORDER BY player_slot
+            """,
+            (chat_key, consent_date),
+        )
+
+    def accepted_consent_slots(self, session_id: int) -> set[str]:
+        rows = self.db.fetchall(
+            """
+            SELECT consent_type
+            FROM session_consents
+            WHERE session_id = ?
+              AND consent_type IN ('base_game:player_1', 'base_game:player_2')
+              AND accepted = 1
+            """,
+            (session_id,),
+        )
+        return {
+            str(row["consent_type"]).split(":", 1)[1]
+            for row in rows
+        }
 
     def set_restricted_content(self, session_id: int, enabled: bool) -> None:
         self.db.execute(

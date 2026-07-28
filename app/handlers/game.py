@@ -6,7 +6,6 @@ from aiogram.types import CallbackQuery
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
 from app.keyboards.game import (
-    boundary_menu,
     card_actions,
     category_menu,
     consent_menu,
@@ -15,15 +14,12 @@ from app.keyboards.game import (
     level_menu,
     main_menu,
 )
-from app.keyboards.inventory import inventory_menu
 from app.services.card_picker import NoCardsAvailable
 from app.services.game_service import BASE_CONSENT_REQUIRED, GameError, GameService, format_card
 from app.services.safety_service import SafetyService
 from app.services.timer_service import TimerService
 
 router = Router(name="game")
-INVENTORY_SELECTIONS: dict[tuple[int, int], dict[str, int]] = {}
-BOUNDARY_SELECTIONS: dict[tuple[int, int], set[str]] = {}
 
 
 def _chat_id(callback: CallbackQuery) -> int:
@@ -32,17 +28,11 @@ def _chat_id(callback: CallbackQuery) -> int:
     return callback.message.chat.id
 
 
-def _inventory_key(callback: CallbackQuery) -> tuple[int, int]:
-    return (_chat_id(callback), callback.from_user.id)
-
-
 def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
     status = game_service.status(chat_id, thread_id)
     if not status["active"]:
         return main_menu()
     return main_menu(
-        allow_level_4=bool(status["allow_level_4"]),
-        hard_enabled=status["max_intensity"] == "hard",
         has_active_turn=bool(status["has_active_turn"]),
         restricted_enabled=bool(status["restricted_content"]),
         enabled_levels=tuple(status["enabled_levels"]),
@@ -52,7 +42,6 @@ def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
 def _level_menu(game_service: GameService, chat_id: int, thread_id: int | None):
     status = game_service.status(chat_id, thread_id)
     return level_menu(
-        allow_level_4=bool(status.get("allow_level_4", False)),
         restricted_enabled=bool(status.get("restricted_content", False)),
     )
 
@@ -104,9 +93,13 @@ async def cb_game_menu(callback: CallbackQuery, config: Config, game_service: Ga
         await answer_callback(callback, str(exc), show_alert=True)
         return
     if not game_service.has_base_consent(_chat_id(callback), callback_thread_id(callback)):
+        player_name = game_service.next_consent_label(
+            _chat_id(callback),
+            callback_thread_id(callback),
+        )
         await callback.message.answer(
-            "Перед первой карточкой подтвердите согласие на игру.",
-            reply_markup=consent_menu(),
+            f"Перед первой карточкой согласие подтверждает {player_name}.",
+            reply_markup=consent_menu(player_name),
         )
         await answer_callback(callback)
         return
@@ -127,16 +120,23 @@ async def cb_base_consent(callback: CallbackQuery, config: Config, game_service:
     except GameError as exc:
         await answer_callback(callback, str(exc), show_alert=True)
         return
-    text = (
-        "Подтверждение получено. Можно начинать."
-        if ready and config.single_account_two_players
-        else "Оба подтверждения получены. Можно начинать."
+    next_player = (
+        None
         if ready
-        else "Подтверждение записано. Нужно подтверждение второго игрока."
+        else game_service.next_consent_label(_chat_id(callback), callback_thread_id(callback))
+    )
+    text = (
+        "Оба подтверждения получены. Можно начинать."
+        if ready
+        else f"Подтверждение записано. Теперь подтверждает {next_player}."
     )
     await callback.message.answer(
         text,
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+        reply_markup=(
+            _main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
+            if ready
+            else consent_menu(next_player)
+        ),
     )
     await answer_callback(callback)
 
@@ -146,11 +146,10 @@ async def cb_level(callback: CallbackQuery, config: Config, game_service: GameSe
     if await reject_callback_if_not_allowed(callback, config):
         return
     level = int(callback.data.split(":")[-1])
-    status = game_service.status(_chat_id(callback), callback_thread_id(callback))
     if level >= 3:
         await callback.message.answer(
             "Выберите интенсивность:",
-            reply_markup=intensity_menu(level, hard_enabled=status.get("max_intensity") == "hard"),
+            reply_markup=intensity_menu(level),
         )
     else:
         await callback.message.answer("Выберите категорию:", reply_markup=category_menu(level, "light"))
@@ -330,11 +329,17 @@ async def cb_replace_card(
             callback.from_user.id,
         )
     except NoCardsAvailable:
-        if session_id:
-            safety_service.safe_skip(session_id, turn_id, callback.from_user.id)
+        current = game_service.current_card(
+            _chat_id(callback),
+            callback_thread_id(callback),
+        )
         await callback.message.answer(
-            "Карточка заменена, но другой подходящей карточки по этим условиям не осталось.",
-            reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+            "Другой подходящей карточки по этим условиям нет. Текущая карточка сохранена.",
+            reply_markup=(
+                card_actions(current.turn_id, bool(current.card.timer_seconds))
+                if current
+                else _main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
+            ),
         )
         await answer_callback(callback)
         return
@@ -357,10 +362,7 @@ async def cb_default_levels(callback: CallbackQuery, config: Config, game_servic
     status = game_service.status(_chat_id(callback), callback_thread_id(callback))
     await callback.message.answer(
         "Выберите уровни, из которых рулетка будет брать карточки по умолчанию:",
-        reply_markup=default_levels_menu(
-            tuple(status.get("enabled_levels", (1, 2, 3))),
-            allow_level_4=bool(status.get("allow_level_4", False)),
-        ),
+        reply_markup=default_levels_menu(tuple(status.get("enabled_levels", (1, 2, 3, 4)))),
     )
     await answer_callback(callback)
 
@@ -371,7 +373,7 @@ async def cb_default_level(callback: CallbackQuery, config: Config, game_service
         return
     level = int(callback.data.split(":")[-1])
     status = game_service.status(_chat_id(callback), callback_thread_id(callback))
-    selected = set(status.get("enabled_levels", (1, 2, 3)))
+    selected = set(status.get("enabled_levels", (1, 2, 3, 4)))
     try:
         updated = game_service.set_enabled_level(
             _chat_id(callback),
@@ -382,12 +384,7 @@ async def cb_default_level(callback: CallbackQuery, config: Config, game_service
     except GameError as exc:
         await answer_callback(callback, str(exc), show_alert=True)
         return
-    await callback.message.edit_reply_markup(
-        reply_markup=default_levels_menu(
-            updated,
-            allow_level_4=bool(status.get("allow_level_4", False)),
-        )
-    )
+    await callback.message.edit_reply_markup(reply_markup=default_levels_menu(updated))
     await answer_callback(callback)
 
 
@@ -423,170 +420,6 @@ async def cb_reset_no(callback: CallbackQuery, config: Config, game_service: Gam
         return
     await callback.message.answer(
         "Продолжаем.",
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
-    )
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data == "game:level4")
-async def cb_level4(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    try:
-        session = game_service.ensure_session(
-            _chat_id(callback),
-            callback_thread_id(callback),
-            callback.message.chat.title if callback.message else None,
-        )
-        was_enabled = bool(session["allow_level_4"])
-        enabled = game_service.set_level_4_consent(
-            _chat_id(callback),
-            callback_thread_id(callback),
-            callback.from_user.id,
-            not was_enabled,
-        )
-    except GameError as exc:
-        await answer_callback(callback, str(exc), show_alert=True)
-        return
-    text = (
-        "Уровень 4 включен."
-        if enabled
-        else "Уровень 4 выключен."
-        if was_enabled
-        else "Согласие записано. Нужно подтверждение второго игрока."
-    )
-    await callback.message.edit_reply_markup(
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
-    )
-    await answer_callback(callback, text, show_alert=False)
-
-
-@router.callback_query(F.data == "game:hard")
-async def cb_hard(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    try:
-        session = game_service.ensure_session(
-            _chat_id(callback),
-            callback_thread_id(callback),
-            callback.message.chat.title if callback.message else None,
-        )
-        was_enabled = session["max_intensity"] == "hard"
-        enabled = game_service.set_hard_consent(
-            _chat_id(callback),
-            callback_thread_id(callback),
-            callback.from_user.id,
-            not was_enabled,
-        )
-    except GameError as exc:
-        await answer_callback(callback, str(exc), show_alert=True)
-        return
-    text = (
-        "Жесткий режим включен."
-        if enabled
-        else "Жесткий режим выключен."
-        if was_enabled
-        else "Согласие записано. Нужно подтверждение второго игрока."
-    )
-    await callback.message.edit_reply_markup(
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback))
-    )
-    await answer_callback(callback, text, show_alert=False)
-
-
-@router.callback_query(F.data == "inv:menu")
-async def cb_inventory(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    game_service.ensure_session(
-        _chat_id(callback),
-        callback_thread_id(callback),
-        callback.message.chat.title if callback.message else None,
-    )
-    selected = dict(game_service.items_for_active_session(_chat_id(callback), callback_thread_id(callback)))
-    INVENTORY_SELECTIONS[_inventory_key(callback)] = selected
-    await callback.message.answer(
-        "Настройте реквизит. Нажатие меняет частоту: выключен → редко → иногда → часто.",
-        reply_markup=inventory_menu(game_service.available_items(), selected),
-    )
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data.startswith("inv:toggle:"))
-async def cb_inventory_toggle(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    code = callback.data.split(":")[-1]
-    key = _inventory_key(callback)
-    selected = INVENTORY_SELECTIONS.setdefault(
-        key,
-        dict(game_service.items_for_active_session(_chat_id(callback), callback_thread_id(callback))),
-    )
-    next_frequency = (int(selected.get(code, 0)) + 1) % 4
-    if next_frequency:
-        selected[code] = next_frequency
-    else:
-        selected.pop(code, None)
-    await callback.message.edit_reply_markup(
-        reply_markup=inventory_menu(game_service.available_items(), selected)
-    )
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data == "inv:save")
-async def cb_inventory_save(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    selected = INVENTORY_SELECTIONS.pop(
-        _inventory_key(callback),
-        dict(game_service.items_for_active_session(_chat_id(callback), callback_thread_id(callback))),
-    )
-    game_service.set_items_for_active_session(_chat_id(callback), callback_thread_id(callback), selected)
-    await callback.message.answer(
-        "Реквизит и частота выпадения сохранены для текущей сессии.",
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
-    )
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data == "boundaries:menu")
-async def cb_boundaries(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    selected = game_service.boundaries_for_active_session(_chat_id(callback), callback_thread_id(callback))
-    BOUNDARY_SELECTIONS[_inventory_key(callback)] = set(selected)
-    await callback.message.answer("Что сегодня точно исключаем?", reply_markup=boundary_menu(selected))
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data.startswith("boundaries:toggle:"))
-async def cb_boundaries_toggle(callback: CallbackQuery, config: Config) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    code = callback.data.split(":")[-1]
-    key = _inventory_key(callback)
-    selected = BOUNDARY_SELECTIONS.setdefault(key, set())
-    if code in selected:
-        selected.remove(code)
-    else:
-        selected.add(code)
-    await callback.message.edit_reply_markup(reply_markup=boundary_menu(selected))
-    await answer_callback(callback)
-
-
-@router.callback_query(F.data == "boundaries:save")
-async def cb_boundaries_save(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
-    if await reject_callback_if_not_allowed(callback, config):
-        return
-    selected = BOUNDARY_SELECTIONS.pop(_inventory_key(callback), set())
-    game_service.set_boundaries_for_active_session(
-        _chat_id(callback),
-        callback_thread_id(callback),
-        sorted(selected),
-        callback.from_user.id,
-    )
-    await callback.message.answer(
-        "Границы сохранены.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
     await answer_callback(callback)

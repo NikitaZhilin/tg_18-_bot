@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 import sqlite3
 
-from app.domain import PickFilter, PickedCard, intensity_allowed, int_to_bool, parse_json_list
+from app.domain import PickFilter, PickedCard, int_to_bool, parse_json_list
 from app.storage import Database
 
 
@@ -66,8 +66,6 @@ class CardPicker:
                 """
             )
             params.append(filters.collection_code)
-        if not filters.allow_level_4:
-            where.append("c.level < 4")
         if not filters.allow_restricted_content:
             where.append(
                 """
@@ -98,8 +96,6 @@ class CardPicker:
         for row in rows:
             risk_tags = set(parse_json_list(row["risk_tags"]))
             avoid_if_tags = set(parse_json_list(row["avoid_if_tags"]))
-            if not intensity_allowed(row["intensity"], filters.max_intensity):
-                continue
             if blocked_tags.intersection(risk_tags) or blocked_tags.intersection(avoid_if_tags):
                 continue
             if row["item_mode"] == "required" and not self._has_eligible_item(
@@ -195,7 +191,6 @@ class CardPicker:
             title=row["title"],
             text=row["text"],
             timer_seconds=row["timer_seconds"],
-            safety_level=row["safety_level"],
             risk_tags=tuple(parse_json_list(row["risk_tags"])),
             aftercare_required=int_to_bool(row["aftercare_required"]),
             display_number=display_number,

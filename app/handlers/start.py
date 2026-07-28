@@ -26,8 +26,6 @@ async def cmd_start(message: Message, config: Config, game_service: GameService)
         await message.answer(
             "Игра уже подтверждена. Текущий прогресс сохранен.",
             reply_markup=main_menu(
-                allow_level_4=bool(status["allow_level_4"]),
-                hard_enabled=status["max_intensity"] == "hard",
                 has_active_turn=bool(status["has_active_turn"]),
                 restricted_enabled=bool(status["restricted_content"]),
                 enabled_levels=tuple(status["enabled_levels"]),

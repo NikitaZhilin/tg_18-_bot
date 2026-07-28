@@ -7,7 +7,6 @@ from typing import Iterable
 
 CATEGORIES = {"question", "task", "pose", "desire", "penalty"}
 INTENSITIES = {"light", "medium", "hard"}
-INTENSITY_ORDER = {"light": 1, "medium": 2, "hard": 3}
 
 FORBIDDEN_RISK_TAGS = {
     "minor_or_age_ambiguous",
@@ -51,8 +50,6 @@ class PickFilter:
     category: str | None = None
     intensity: str | None = None
     collection_code: str | None = None
-    allow_level_4: bool = False
-    max_intensity: str = "light"
     allow_restricted_content: bool = False
 
 
@@ -66,7 +63,6 @@ class PickedCard:
     title: str | None
     text: str
     timer_seconds: int | None
-    safety_level: str
     risk_tags: tuple[str, ...]
     aftercare_required: bool
     display_number: int
@@ -109,7 +105,3 @@ def bool_to_int(value: bool) -> int:
 
 def int_to_bool(value: object) -> bool:
     return bool(int(value or 0))
-
-
-def intensity_allowed(card_intensity: str, max_intensity: str) -> bool:
-    return INTENSITY_ORDER[card_intensity] <= INTENSITY_ORDER[max_intensity]

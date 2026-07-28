@@ -1,0 +1,75 @@
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python scripts/audit_card_content.py
+      - run: python scripts/import_cards.py --check content/cards.csv
+        env:
+          DRY_RUN: "true"
+          ALLOW_UNLISTED_USERS: "true"
+          DATA_DIR: .tmp/ci-data
+          DATABASE_PATH: .tmp/ci-data/import.sqlite3
+      - run: python scripts/import_cards.py --check content/restricted_cards.csv
+        env:
+          DRY_RUN: "true"
+          ALLOW_UNLISTED_USERS: "true"
+          DATA_DIR: .tmp/ci-data
+          DATABASE_PATH: .tmp/ci-data/import.sqlite3
+      - run: python scripts/smoke_start.py
+      - run: python -m pytest
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SSH client helper
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Trust deployment host
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          port="${DEPLOY_PORT:-22}"
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+      - name: Deploy tested commit
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$SSHPASS"
+          port="${DEPLOY_PORT:-22}"
+          sshpass -e ssh -p "$port" \
+            -o BatchMode=no \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$GITHUB_SHA'" < scripts/deploy_server.sh

@@ -25,10 +25,7 @@ CARD_COLUMNS = [
     "avoid_if_tags",
     "source_note",
     "timer_seconds",
-    "safety_level",
     "risk_tags",
-    "requires_both_opt_in",
-    "requires_safeword_check",
     "aftercare_required",
     "item_mode",
     "is_enabled",
@@ -180,12 +177,53 @@ class CardRepository:
             (card_id,),
         ).fetchone()["version"]
         snapshot = {key: card[key] for key in card.keys()}
+        snapshot["_required_items"] = [
+            row["item_code"]
+            for row in executor.execute(
+                "SELECT item_code FROM card_required_items WHERE card_id = ? ORDER BY item_code",
+                (card_id,),
+            ).fetchall()
+        ]
+        snapshot["_collections"] = [
+            row["collection_code"]
+            for row in executor.execute(
+                """
+                SELECT collection_code
+                FROM card_collection_items
+                WHERE card_id = ?
+                ORDER BY collection_code
+                """,
+                (card_id,),
+            ).fetchall()
+        ]
         executor.execute(
             """
             INSERT INTO card_versions (card_id, version_number, snapshot_json, changed_by, change_reason)
             VALUES (?, ?, ?, ?, ?)
             """,
             (card_id, next_version, json.dumps(snapshot, ensure_ascii=False), changed_by, change_reason),
+        )
+
+    def list_versions(self, card_id: int, limit: int = 10) -> list[sqlite3.Row]:
+        return self.db.fetchall(
+            """
+            SELECT id, card_id, version_number, changed_by, change_reason, created_at
+            FROM card_versions
+            WHERE card_id = ?
+            ORDER BY version_number DESC
+            LIMIT ?
+            """,
+            (card_id, limit),
+        )
+
+    def get_version(self, card_id: int, version_id: int) -> sqlite3.Row | None:
+        return self.db.fetchone(
+            """
+            SELECT *
+            FROM card_versions
+            WHERE id = ? AND card_id = ?
+            """,
+            (version_id, card_id),
         )
 
     def set_status(
@@ -239,9 +277,6 @@ class CardRepository:
         clean["avoid_if_tags"] = dump_json_list(parse_json_list(clean.get("avoid_if_tags")))
         clean["risk_tags"] = dump_json_list(parse_json_list(clean.get("risk_tags")))
         clean["timer_seconds"] = int(clean["timer_seconds"]) if clean.get("timer_seconds") else None
-        clean["safety_level"] = clean.get("safety_level") or "normal"
-        clean["requires_both_opt_in"] = int(clean.get("requires_both_opt_in") or 0)
-        clean["requires_safeword_check"] = int(clean.get("requires_safeword_check") or 0)
         clean["aftercare_required"] = int(clean.get("aftercare_required") or 0)
         clean["item_mode"] = clean.get("item_mode") or "none"
         clean["is_enabled"] = int(clean.get("is_enabled") or 0)

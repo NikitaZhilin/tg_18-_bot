@@ -31,5 +31,5 @@ def inventory_menu(items: Sequence[Mapping[str, object]], selected: dict[str, in
         )
     rows.append([InlineKeyboardButton(text="Сохранить", callback_data="inv:save")])
     rows.append([InlineKeyboardButton(text="В меню", callback_data="game:home")])
-    rows.append([InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")])
+    rows.append([InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

@@ -85,8 +85,6 @@ def test_extreme_sheet_content_is_consistently_gated():
         assert row["level"] == "4"
         assert row["intensity"] == "hard"
         assert row["collection"] == "restricted_content"
-        assert row["requires_both_opt_in"] == "1"
-        assert row["requires_safeword_check"] == "1"
         assert row["aftercare_required"] == "1"
 
     active = [row for row in rows if row["review_status"] == "approved"]

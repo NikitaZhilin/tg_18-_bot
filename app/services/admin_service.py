@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from app.services.content_importer import ContentImporter, ImportReport
 from app.storage import Database
 from app.storage.repositories.admin_actions import AdminActionRepository
-from app.storage.repositories.cards import CardRepository
+from app.storage.repositories.cards import CARD_COLUMNS, CardRepository
 from app.storage.repositories.items import ItemRepository
 
 
@@ -129,6 +130,230 @@ class AdminService:
             )
         ]
         return result
+
+    def list_card_versions(self, card_id: int, limit: int = 10):
+        return self.cards.list_versions(card_id, limit)
+
+    def get_card_version(self, card_id: int, version_id: int) -> dict[str, Any] | None:
+        row = self.cards.get_version(card_id, version_id)
+        if not row:
+            return None
+        result = dict(row)
+        result["snapshot"] = json.loads(str(row["snapshot_json"]))
+        return result
+
+    def restore_card_version(self, admin_user_id: int, card_id: int, version_id: int) -> None:
+        with self.db.transaction() as conn:
+            version = conn.execute(
+                "SELECT * FROM card_versions WHERE id = ? AND card_id = ?",
+                (version_id, card_id),
+            ).fetchone()
+            current = self.cards.get(card_id, conn)
+            if not version or not current:
+                raise ValueError("Версия карточки не найдена")
+            snapshot = json.loads(str(version["snapshot_json"]))
+            if not isinstance(snapshot, dict):
+                raise ValueError("Снимок версии поврежден")
+            self.cards.save_version(
+                card_id,
+                admin_user_id,
+                f"before_restore_version_{version['version_number']}",
+                conn,
+            )
+            current_items = [
+                row["item_code"]
+                for row in conn.execute(
+                    "SELECT item_code FROM card_required_items WHERE card_id = ?",
+                    (card_id,),
+                ).fetchall()
+            ]
+            current_collections = [
+                row["collection_code"]
+                for row in conn.execute(
+                    "SELECT collection_code FROM card_collection_items WHERE card_id = ?",
+                    (card_id,),
+                ).fetchall()
+            ]
+            card_data = {
+                column: snapshot.get(column, current[column])
+                for column in CARD_COLUMNS
+            }
+            required_items = snapshot.get("_required_items", current_items)
+            collections = snapshot.get("_collections", current_collections)
+            self.cards.upsert(card_data, list(required_items), list(collections), conn)
+            conn.execute(
+                """
+                UPDATE cards
+                SET is_archived = ?, deleted_at = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    int(snapshot.get("is_archived", current["is_archived"])),
+                    snapshot.get("deleted_at", current["deleted_at"]),
+                    card_id,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO admin_actions (
+                    admin_user_id, action_type, target_type, target_id, details_json
+                )
+                VALUES (?, 'rollback_card', 'card', ?, ?)
+                """,
+                (
+                    admin_user_id,
+                    str(card_id),
+                    json.dumps(
+                        {"restored_version": int(version["version_number"])},
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+
+    def list_seed_conflicts(self, limit: int = 10):
+        return self.db.fetchall(
+            """
+            SELECT sc.*, c.text AS current_text, c.title AS current_title
+            FROM seed_conflicts sc
+            JOIN cards c ON c.id = sc.card_id
+            WHERE sc.status = 'pending'
+            ORDER BY sc.created_at DESC, sc.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+    def get_seed_conflict(self, conflict_id: int) -> dict[str, Any] | None:
+        row = self.db.fetchone(
+            """
+            SELECT sc.*, c.text AS current_text, c.title AS current_title
+            FROM seed_conflicts sc
+            JOIN cards c ON c.id = sc.card_id
+            WHERE sc.id = ?
+            """,
+            (conflict_id,),
+        )
+        if not row:
+            return None
+        result = dict(row)
+        result["incoming"] = json.loads(str(row["incoming_json"]))
+        return result
+
+    def resolve_seed_conflict(
+        self,
+        admin_user_id: int,
+        conflict_id: int,
+        *,
+        apply_seed: bool,
+    ) -> int:
+        with self.db.transaction() as conn:
+            conflict = conn.execute(
+                "SELECT * FROM seed_conflicts WHERE id = ? AND status = 'pending'",
+                (conflict_id,),
+            ).fetchone()
+            if not conflict:
+                raise ValueError("Конфликт уже решен или не найден")
+            card_id = int(conflict["card_id"])
+            if apply_seed:
+                incoming = json.loads(str(conflict["incoming_json"]))
+                self.cards.save_version(card_id, admin_user_id, "before_seed_update", conn)
+                self.cards.upsert(
+                    incoming["card"],
+                    list(incoming.get("required_items", [])),
+                    list(incoming.get("collections", [])),
+                    conn,
+                )
+                self.cards.set_archived(
+                    card_id,
+                    bool(incoming.get("is_archived", False)),
+                    conn,
+                )
+            status = "apply_seed" if apply_seed else "keep_local"
+            conn.execute(
+                """
+                UPDATE seed_conflicts
+                SET status = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (status, admin_user_id, conflict_id),
+            )
+            conn.execute(
+                """
+                INSERT INTO admin_actions (
+                    admin_user_id, action_type, target_type, target_id, details_json
+                )
+                VALUES (?, 'update_card', 'seed_conflict', ?, ?)
+                """,
+                (
+                    admin_user_id,
+                    str(conflict_id),
+                    json.dumps({"resolution": status, "card_id": card_id}, ensure_ascii=False),
+                ),
+            )
+            return card_id
+
+    def list_card_feedback(self, limit: int = 10):
+        return self.db.fetchall(
+            """
+            SELECT
+                cf.id,
+                cf.card_id,
+                cf.player_slot,
+                cf.created_at,
+                c.external_id,
+                c.title
+            FROM card_feedback cf
+            JOIN cards c ON c.id = cf.card_id
+            WHERE cf.status = 'new'
+            ORDER BY cf.created_at DESC, cf.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+    def get_card_feedback(self, feedback_id: int):
+        return self.db.fetchone(
+            """
+            SELECT
+                cf.*,
+                c.external_id,
+                c.title,
+                c.text
+            FROM card_feedback cf
+            JOIN cards c ON c.id = cf.card_id
+            WHERE cf.id = ?
+            """,
+            (feedback_id,),
+        )
+
+    def resolve_card_feedback(self, admin_user_id: int, feedback_id: int) -> int:
+        with self.db.transaction() as conn:
+            feedback = conn.execute(
+                "SELECT card_id FROM card_feedback WHERE id = ? AND status = 'new'",
+                (feedback_id,),
+            ).fetchone()
+            if not feedback:
+                raise ValueError("Сообщение уже обработано или не найдено")
+            conn.execute(
+                """
+                UPDATE card_feedback
+                SET status = 'resolved',
+                    resolved_by = ?,
+                    resolved_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (admin_user_id, feedback_id),
+            )
+            conn.execute(
+                """
+                INSERT INTO admin_actions (
+                    admin_user_id, action_type, target_type, target_id, details_json
+                )
+                VALUES (?, 'update_card', 'card_feedback', ?, '{}')
+                """,
+                (admin_user_id, str(feedback_id)),
+            )
+            return int(feedback["card_id"])
 
     def update_card_field(
         self,
@@ -302,12 +527,9 @@ class AdminService:
                 ) AS collections,
                 c.review_status,
                 c.is_enabled,
-                c.requires_both_opt_in,
-                c.requires_safeword_check,
                 c.aftercare_required,
                 c.item_mode,
                 c.is_archived,
-                c.safety_level,
                 c.pose_family,
                 c.pose_difficulty,
                 c.space_required,

@@ -11,12 +11,18 @@ from app.keyboards.admin import (
     admin_menu,
     admin_navigation,
     card_edit_menu,
+    card_feedback_actions,
+    card_feedback_list,
     card_manage,
+    card_version_manage,
+    card_versions,
     catalog_categories,
     catalog_page,
     catalog_sections,
     delete_card_confirm,
     edit_choice,
+    seed_conflict_choice,
+    seed_conflicts,
 )
 from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, ITEM_MODE_NAMES, LEVEL_NAMES, REVIEW_STATUS_NAMES
 from app.services.admin_service import AdminService
@@ -156,6 +162,202 @@ async def cb_card_simple(callback: CallbackQuery, config: Config, admin_service:
     if await reject_callback_if_not_admin(callback, config):
         return
     await _show_card(callback, admin_service, int(callback.data.split(":")[-1]))
+
+
+@router.callback_query(F.data.startswith("admin:versions:"))
+async def cb_card_versions(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    card_id = int(callback.data.split(":")[-1])
+    rows = admin_service.list_card_versions(card_id)
+    text = (
+        f"История карточки #{card_id}. Выберите снимок для просмотра."
+        if rows
+        else f"У карточки #{card_id} пока нет сохраненных версий."
+    )
+    await callback.message.answer(text, reply_markup=card_versions(rows, card_id))
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:version:"))
+async def cb_card_version(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    _, _, card_id_raw, version_id_raw = callback.data.split(":")
+    version = admin_service.get_card_version(int(card_id_raw), int(version_id_raw))
+    if not version:
+        await answer_callback(callback, "Версия не найдена.", show_alert=True)
+        return
+    snapshot = version["snapshot"]
+    await callback.message.answer(
+        f"Карточка #{card_id_raw} · версия {version['version_number']}\n"
+        f"Причина: {version['change_reason'] or 'не указана'}\n"
+        f"Сохранена: {version['created_at']}\n\n"
+        f"Название: {snapshot.get('title') or 'без отдельного названия'}\n"
+        f"Текст:\n{snapshot.get('text') or 'нет текста'}",
+        reply_markup=card_version_manage(int(card_id_raw), int(version_id_raw)),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:restore_version:"))
+async def cb_restore_card_version(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    _, _, card_id_raw, version_id_raw = callback.data.split(":")
+    try:
+        admin_service.restore_card_version(
+            callback.from_user.id,
+            int(card_id_raw),
+            int(version_id_raw),
+        )
+    except ValueError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await callback.message.answer("Выбранная версия восстановлена.")
+    await _show_card(callback, admin_service, int(card_id_raw), answer=False)
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data == "admin:conflicts")
+async def cb_seed_conflicts(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    rows = admin_service.list_seed_conflicts()
+    text = (
+        "Выберите конфликт. Бот покажет текущий и встроенный тексты."
+        if rows
+        else "Неразрешенных конфликтов обновления нет."
+    )
+    await callback.message.answer(text, reply_markup=seed_conflicts(rows))
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:conflict:"))
+async def cb_seed_conflict(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    conflict_id = int(callback.data.split(":")[-1])
+    conflict = admin_service.get_seed_conflict(conflict_id)
+    if not conflict or conflict["status"] != "pending":
+        await answer_callback(callback, "Конфликт уже решен или не найден.", show_alert=True)
+        return
+    incoming = conflict["incoming"]["card"]
+    await callback.message.answer(
+        f"Конфликт для {conflict['external_id']}\n"
+        f"Версия набора: {conflict['content_version']}\n\n"
+        f"Текущая версия:\n{conflict['current_text']}\n\n"
+        f"Встроенная версия:\n{incoming.get('text') or 'нет текста'}",
+        reply_markup=seed_conflict_choice(conflict_id),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:resolve_conflict:"))
+async def cb_resolve_seed_conflict(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    _, _, conflict_id_raw, choice = callback.data.split(":")
+    try:
+        card_id = admin_service.resolve_seed_conflict(
+            callback.from_user.id,
+            int(conflict_id_raw),
+            apply_seed=choice == "apply",
+        )
+    except ValueError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await callback.message.answer(
+        "Встроенная версия применена." if choice == "apply" else "Сохранена ваша версия."
+    )
+    await _show_card(callback, admin_service, card_id, answer=False)
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data == "admin:feedback")
+async def cb_card_feedback_list(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    rows = admin_service.list_card_feedback()
+    text = (
+        "Карточки, которые игроки отметили как непонятные:"
+        if rows
+        else "Новых сообщений о непонятных карточках нет."
+    )
+    await callback.message.answer(text, reply_markup=card_feedback_list(rows))
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:feedback_item:"))
+async def cb_card_feedback_item(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    feedback_id = int(callback.data.split(":")[-1])
+    feedback = admin_service.get_card_feedback(feedback_id)
+    if not feedback or feedback["status"] != "new":
+        await answer_callback(callback, "Сообщение уже обработано или не найдено.", show_alert=True)
+        return
+    await callback.message.answer(
+        f"Непонятная карточка: {feedback['external_id'] or '#' + str(feedback['card_id'])}\n"
+        f"Игрок: {feedback['player_slot']}\n"
+        f"Отмечена: {feedback['created_at']}\n\n"
+        f"{feedback['text']}",
+        reply_markup=card_feedback_actions(feedback_id, int(feedback["card_id"])),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("admin:feedback_resolve:"))
+async def cb_card_feedback_resolve(
+    callback: CallbackQuery,
+    config: Config,
+    admin_service: AdminService,
+) -> None:
+    if await reject_callback_if_not_admin(callback, config):
+        return
+    feedback_id = int(callback.data.split(":")[-1])
+    try:
+        admin_service.resolve_card_feedback(callback.from_user.id, feedback_id)
+    except ValueError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await callback.message.answer(
+        "Сообщение отмечено обработанным.",
+        reply_markup=card_feedback_list(admin_service.list_card_feedback()),
+    )
+    await answer_callback(callback)
 
 
 @router.callback_query(F.data.startswith("admin:archive:"))
