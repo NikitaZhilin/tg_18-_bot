@@ -6,8 +6,9 @@ from aiogram.types import CallbackQuery
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
 from app.keyboards.desires import desire_actions, desire_list
-from app.keyboards.game import main_menu
+from app.keyboards.game import main_menu_for_status
 from app.services.desire_service import DesireError, DesireService
+from app.services.game_service import GameService
 
 
 router = Router(name="desires")
@@ -19,8 +20,19 @@ def _chat_id(callback: CallbackQuery) -> int:
     return callback.message.chat.id
 
 
+def _main_menu(game_service: GameService, callback: CallbackQuery):
+    return main_menu_for_status(
+        game_service.status(_chat_id(callback), callback_thread_id(callback))
+    )
+
+
 @router.callback_query(F.data.startswith("game:desires"))
-async def cb_desires(callback: CallbackQuery, config: Config, desire_service: DesireService) -> None:
+async def cb_desires(
+    callback: CallbackQuery,
+    config: Config,
+    desire_service: DesireService,
+    game_service: GameService,
+) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
     page = int(callback.data.split(":")[-1]) if callback.data.count(":") == 2 else 0
@@ -36,7 +48,10 @@ async def cb_desires(callback: CallbackQuery, config: Config, desire_service: De
         await answer_callback(callback, str(exc), show_alert=True)
         return
     if not rows:
-        await callback.message.answer("Сохраненных желаний пока нет.", reply_markup=main_menu())
+        await callback.message.answer(
+            "Сохраненных желаний пока нет.",
+            reply_markup=_main_menu(game_service, callback),
+        )
         await answer_callback(callback)
         return
     await callback.message.answer(
@@ -78,7 +93,12 @@ async def cb_desire(callback: CallbackQuery, config: Config, desire_service: Des
 
 
 @router.callback_query(F.data.startswith("game:desire_use:"))
-async def cb_desire_use(callback: CallbackQuery, config: Config, desire_service: DesireService) -> None:
+async def cb_desire_use(
+    callback: CallbackQuery,
+    config: Config,
+    desire_service: DesireService,
+    game_service: GameService,
+) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
     desire_id = int(callback.data.split(":")[-1])
@@ -94,6 +114,6 @@ async def cb_desire_use(callback: CallbackQuery, config: Config, desire_service:
         return
     await callback.message.answer(
         f"Желание использовано:\n\n{desire['text']}",
-        reply_markup=main_menu(),
+        reply_markup=_main_menu(game_service, callback),
     )
     await answer_callback(callback)

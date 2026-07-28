@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
@@ -45,6 +47,16 @@ def main_menu(
         )
     return InlineKeyboardMarkup(
         inline_keyboard=rows
+    )
+
+
+def main_menu_for_status(status: Mapping[str, object]) -> InlineKeyboardMarkup:
+    if not status.get("active"):
+        return main_menu()
+    return main_menu(
+        has_active_turn=bool(status.get("has_active_turn")),
+        restricted_enabled=bool(status.get("restricted_content")),
+        enabled_levels=tuple(status.get("enabled_levels") or (1, 2, 3, 4)),
     )
 
 

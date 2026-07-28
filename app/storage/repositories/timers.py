@@ -133,7 +133,10 @@ class TimerRepository:
         self.db.execute(
             """
             UPDATE timers
-            SET status = 'cancelled', claim_token = NULL, claim_until = NULL
+            SET status = 'cancelled',
+                next_attempt_at = NULL,
+                claim_token = NULL,
+                claim_until = NULL
             WHERE session_id = ? AND status = 'active'
             """,
             (session_id,),

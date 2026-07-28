@@ -157,41 +157,6 @@ class SessionRepository:
             (session_id, user_id, consent_type, 1 if accepted else 0),
         )
 
-    def accepted_count(self, session_id: int, consent_type: str) -> int:
-        row = self.db.fetchone(
-            """
-            SELECT COUNT(*) AS count
-            FROM session_consents
-            WHERE session_id = ? AND consent_type = ? AND accepted = 1
-            """,
-            (session_id, consent_type),
-        )
-        return int(row["count"])
-
-    def add_daily_consent(self, chat_key: str, user_id: int, consent_date: str) -> None:
-        self.db.execute(
-            """
-            INSERT INTO daily_consents (chat_key, user_id, consent_date)
-            VALUES (?, ?, ?)
-            ON CONFLICT(chat_key, user_id, consent_date) DO UPDATE SET
-                accepted_at = CURRENT_TIMESTAMP
-            """,
-            (chat_key, user_id, consent_date),
-        )
-
-    def daily_consent_user_ids(self, chat_key: str, consent_date: str) -> set[int]:
-        return {
-            int(row["user_id"])
-            for row in self.db.fetchall(
-                """
-                SELECT user_id
-                FROM daily_consents
-                WHERE chat_key = ? AND consent_date = ?
-                """,
-                (chat_key, consent_date),
-            )
-        }
-
     def add_daily_slot_consent(
         self,
         chat_key: str,

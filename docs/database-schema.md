@@ -6,7 +6,7 @@
 ```text
 app/storage/migrations/001_initial.sql
 ...
-app/storage/migrations/015_daily_slot_consents.sql
+app/storage/migrations/016_cleanup_legacy_session_state.sql
 ```
 
 Такой подход гарантирует одинаковое обновление новой и уже работающей базы.
@@ -34,3 +34,4 @@ requires_safeword_check
 ```
 
 Они могут встречаться в исторической миграции `001`, но удаляются миграцией `008`.
+Устаревшие переключатели уровня 4 и жесткого режима удаляются из `sessions` миграцией `016`.

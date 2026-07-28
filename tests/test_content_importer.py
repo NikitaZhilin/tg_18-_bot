@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+import pytest
+
+from app.main import import_startup_content
 from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
 from app.storage.repositories.cards import CardRepository
@@ -248,4 +251,19 @@ def test_import_rejects_explicit_item_with_disabled_item_mode(tmp_path):
     assert report.added_or_updated == 0
     assert report.warnings_count == 1
     assert "Обязательно подобрать" in report.warnings[0].message
+    db.close()
+
+
+def test_startup_content_import_fails_fast_on_invalid_seed(tmp_path):
+    db = migrated_db(tmp_path)
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "broken.csv").write_text(
+        "external_id,level\nbroken,1\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        import_startup_content(db, content_dir)
+
     db.close()

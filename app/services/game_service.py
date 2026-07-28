@@ -311,7 +311,9 @@ class GameService(SessionSettingsMixin):
             conn.execute(
                 """
                 UPDATE timers
-                SET status = 'cancelled'
+                SET status = 'cancelled',
+                    claim_token = NULL,
+                    claim_until = NULL
                 WHERE turn_id = ? AND status = 'active'
                 """,
                 (turn["id"],),
@@ -404,7 +406,11 @@ class GameService(SessionSettingsMixin):
                 (status, active_turn_id),
             )
             conn.execute(
-                "UPDATE timers SET status = 'cancelled' WHERE turn_id = ? AND status = 'active'",
+                """
+                UPDATE timers
+                SET status = 'cancelled', claim_token = NULL, claim_until = NULL
+                WHERE turn_id = ? AND status = 'active'
+                """,
                 (active_turn_id,),
             )
             current_slot = session["current_player_slot"] or "player_1"
@@ -449,7 +455,11 @@ class GameService(SessionSettingsMixin):
                 (session["id"],),
             )
             conn.execute(
-                "UPDATE timers SET status = 'cancelled' WHERE session_id = ? AND status = 'active'",
+                """
+                UPDATE timers
+                SET status = 'cancelled', claim_token = NULL, claim_until = NULL
+                WHERE session_id = ? AND status = 'active'
+                """,
                 (session["id"],),
             )
             conn.execute(

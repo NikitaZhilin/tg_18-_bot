@@ -37,6 +37,22 @@ from app.storage.fsm import SQLiteFSMStorage
 logger = logging.getLogger(__name__)
 
 
+def import_startup_content(db: Database, content_dir: Path = Path("content")) -> None:
+    for seed_path in sorted(content_dir.glob("*.csv")):
+        digest = hashlib.sha256(seed_path.read_bytes()).hexdigest()[:16]
+        try:
+            ContentImporter(db).import_file(
+                seed_path,
+                content_version=f"startup_seed:{seed_path.name}:{digest}",
+                dry_run=False,
+                preserve_admin_changes=True,
+                skip_imported_version=True,
+            )
+        except Exception:
+            logger.exception("startup seed import failed for %s", seed_path)
+            raise
+
+
 def build_services(config: Config) -> tuple[Database, dict[str, object]]:
     config.data_dir.mkdir(parents=True, exist_ok=True)
     db = Database(config.database_path)
@@ -93,18 +109,7 @@ async def run_async() -> None:
     config.validate_for_runtime()
     db, services = build_services(config)
 
-    for seed_path in sorted(Path("content").glob("*.csv")):
-        try:
-            digest = hashlib.sha256(seed_path.read_bytes()).hexdigest()[:16]
-            ContentImporter(db).import_file(
-                seed_path,
-                content_version=f"startup_seed:{seed_path.name}:{digest}",
-                dry_run=False,
-                preserve_admin_changes=True,
-                skip_imported_version=True,
-            )
-        except Exception:
-            logger.exception("startup seed import failed for %s", seed_path)
+    import_startup_content(db)
 
     if config.dry_run:
         logger.info("DRY_RUN=true; initialization completed without Telegram polling")

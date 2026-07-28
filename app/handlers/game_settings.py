@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery
 
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
-from app.keyboards.game import boundary_menu, main_menu
+from app.keyboards.game import boundary_menu, main_menu_for_status
 from app.keyboards.inventory import inventory_menu
 from app.services.game_service import GameError, GameService
 
@@ -20,14 +20,7 @@ def _chat_id(callback: CallbackQuery) -> int:
 
 
 def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    status = game_service.status(chat_id, thread_id)
-    if not status["active"]:
-        return main_menu()
-    return main_menu(
-        has_active_turn=bool(status["has_active_turn"]),
-        restricted_enabled=bool(status["restricted_content"]),
-        enabled_levels=tuple(status["enabled_levels"]),
-    )
+    return main_menu_for_status(game_service.status(chat_id, thread_id))
 
 
 @router.callback_query(F.data == "inv:menu")

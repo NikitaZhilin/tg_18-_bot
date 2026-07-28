@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from app.keyboards.admin import admin_menu, admin_navigation
-from app.keyboards.game import card_actions, intensity_menu, level_menu, main_menu
+from app.keyboards.game import (
+    card_actions,
+    intensity_menu,
+    level_menu,
+    main_menu,
+    main_menu_for_status,
+)
 from app.keyboards.inventory import inventory_menu
 
 
@@ -50,6 +56,21 @@ def test_game_keyboards_have_main_menu_and_dynamic_modes():
     assert any(text.startswith("Уровни по умолчанию: Секс, BDSM") for text in texts)
     assert "game:level:4" in _callbacks(level_menu())
     assert "game:intensity:4:hard" in _callbacks(intensity_menu(4))
+
+
+def test_status_menu_preserves_active_turn_and_restricted_access():
+    markup = main_menu_for_status(
+        {
+            "active": True,
+            "has_active_turn": True,
+            "restricted_content": True,
+            "enabled_levels": (3, 4),
+        }
+    )
+    texts = [button.text for row in markup.inline_keyboard for button in row]
+    assert "Продолжить текущую карточку" in texts
+    assert "Экстрим" in texts
+    assert "Уровни по умолчанию: Секс, BDSM" in texts
 
 
 def test_inventory_keyboard_displays_frequency_and_menu_return():

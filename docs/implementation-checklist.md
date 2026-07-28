@@ -30,6 +30,7 @@
 | Модули разделены по ответственности | Готово | handlers/services readers/settings |
 | CI перед deploy | Готово | `.github/workflows/ci-deploy.yml` |
 | Backup, health-check и rollback | Готово | `scripts/deploy_server.sh` |
+| Транзакционное применение миграций | Готово | `Database.apply_migrations` |
 
 ## Обязательные проверки
 

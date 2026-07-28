@@ -26,29 +26,38 @@ class Database:
 
     def apply_migrations(self, migrations_dir: str | Path | None = None) -> None:
         base = Path(migrations_dir) if migrations_dir else Path(__file__).parent / "migrations"
-        for migration in sorted(base.glob("*.sql")):
-            sql = migration.read_text(encoding="utf-8")
-            with self._lock:
-                self._conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS schema_migrations (
-                        name TEXT PRIMARY KEY,
-                        applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
+        with self._lock:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    name TEXT PRIMARY KEY,
+                    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
+                """
+            )
+            self._conn.commit()
+            for migration in sorted(base.glob("*.sql")):
                 already_applied = self._conn.execute(
                     "SELECT 1 FROM schema_migrations WHERE name = ?",
                     (migration.name,),
                 ).fetchone()
                 if already_applied:
                     continue
-                self._conn.executescript(sql)
-                self._conn.execute(
-                    "INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)",
-                    (migration.name,),
+                sql = migration.read_text(encoding="utf-8")
+                escaped_name = migration.name.replace("'", "''")
+                script = (
+                    "BEGIN IMMEDIATE;\n"
+                    f"{sql.rstrip()}\n"
+                    "INSERT INTO schema_migrations (name) "
+                    f"VALUES ('{escaped_name}');\n"
+                    "COMMIT;\n"
                 )
-                self._conn.commit()
+                try:
+                    self._conn.executescript(script)
+                except Exception:
+                    if self._conn.in_transaction:
+                        self._conn.rollback()
+                    raise
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:

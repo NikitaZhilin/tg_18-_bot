@@ -12,7 +12,7 @@ from app.keyboards.game import (
     default_levels_menu,
     intensity_menu,
     level_menu,
-    main_menu,
+    main_menu_for_status,
 )
 from app.services.card_picker import NoCardsAvailable
 from app.services.game_service import BASE_CONSENT_REQUIRED, GameError, GameService, format_card
@@ -29,14 +29,7 @@ def _chat_id(callback: CallbackQuery) -> int:
 
 
 def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    status = game_service.status(chat_id, thread_id)
-    if not status["active"]:
-        return main_menu()
-    return main_menu(
-        has_active_turn=bool(status["has_active_turn"]),
-        restricted_enabled=bool(status["restricted_content"]),
-        enabled_levels=tuple(status["enabled_levels"]),
-    )
+    return main_menu_for_status(game_service.status(chat_id, thread_id))
 
 
 def _level_menu(game_service: GameService, chat_id: int, thread_id: int | None):

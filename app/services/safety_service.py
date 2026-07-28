@@ -26,7 +26,11 @@ class SafetyService:
                 (session["id"],),
             )
             conn.execute(
-                "UPDATE timers SET status = 'cancelled' WHERE session_id = ? AND status = 'active'",
+                """
+                UPDATE timers
+                SET status = 'cancelled', claim_token = NULL, claim_until = NULL
+                WHERE session_id = ? AND status = 'active'
+                """,
                 (session["id"],),
             )
             conn.execute(

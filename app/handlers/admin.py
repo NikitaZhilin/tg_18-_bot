@@ -21,7 +21,7 @@ from app.keyboards.admin import (
     save_choice,
     timer_choice,
 )
-from app.keyboards.game import main_menu
+from app.keyboards.game import main_menu_for_status
 from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, LEVEL_NAMES, RISK_TAG_NAMES
 from app.services.admin_service import AdminService
 from app.services.game_service import GameService
@@ -35,14 +35,7 @@ def _admin_menu(game_service: GameService, chat_id: int, thread_id: int | None):
 
 
 def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    status = game_service.status(chat_id, thread_id)
-    if not status["active"]:
-        return main_menu()
-    return main_menu(
-        has_active_turn=bool(status["has_active_turn"]),
-        restricted_enabled=bool(status["restricted_content"]),
-        enabled_levels=tuple(status["enabled_levels"]),
-    )
+    return main_menu_for_status(game_service.status(chat_id, thread_id))
 
 
 @router.message(Command("admin"))
