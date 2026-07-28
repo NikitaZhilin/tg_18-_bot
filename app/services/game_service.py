@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.config import Config
 from app.domain import PickFilter, PickedCard
+from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, LEVEL_NAMES
 from app.services.card_picker import CardPicker, NoCardsAvailable
 from app.storage import Database
 from app.storage.repositories.sessions import SessionRepository
@@ -109,8 +110,41 @@ class GameService:
 
     def available_items(self) -> list[sqlite3.Row]:
         return self.db.fetchall(
-            "SELECT code, name FROM items WHERE is_active = 1 ORDER BY name"
+            """
+            SELECT code, name
+            FROM items
+            WHERE is_active = 1
+              AND is_archived = 0
+              AND deleted_at IS NULL
+            ORDER BY name
+            """
         )
+
+    def enabled_levels(self, chat_id: int, thread_id: int | None) -> tuple[int, ...]:
+        session = self.active_session(chat_id, thread_id)
+        if not session:
+            return ()
+        return self.sessions.enabled_levels(int(session["id"]))
+
+    def set_enabled_level(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        level: int,
+        enabled: bool,
+    ) -> tuple[int, ...]:
+        session = self.active_session(chat_id, thread_id)
+        if not session:
+            raise GameError("Нет активной сессии")
+        current = set(self.sessions.enabled_levels(int(session["id"])))
+        if enabled:
+            current.add(level)
+        else:
+            current.discard(level)
+        if not current:
+            raise GameError("Нужно оставить включенным хотя бы один уровень")
+        self.sessions.set_enabled_level(int(session["id"]), level, enabled)
+        return tuple(sorted(current))
 
     def has_base_consent(self, chat_id: int, thread_id: int | None) -> bool:
         session = self.active_session(chat_id, thread_id)
@@ -207,6 +241,7 @@ class GameService:
         category: str | None,
         intensity: str | None = None,
         source: str = "manual",
+        collection_code: str | None = None,
     ) -> DrawResult:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         with self.db.transaction() as conn:
@@ -227,6 +262,13 @@ class GameService:
                 raise GameError("Штрафы не включены в настройках сессии")
             if source == "penalty":
                 category = "penalty"
+            if collection_code == "restricted_content":
+                if not bool(session["allow_restricted_content"]):
+                    raise GameError("Сначала откройте доступ к разделу «Экстрим» в админке")
+                if not bool(session["allow_level_4"]) or session["max_intensity"] != "hard":
+                    raise GameError("Для раздела «Экстрим» включите BDSM и жесткую интенсивность")
+                level = None
+                intensity = None
 
             turn_number = int(
                 conn.execute(
@@ -240,13 +282,23 @@ class GameService:
             elif source == "roulette" and level is not None and session["max_intensity"] != "hard":
                 picker_max_intensity = "medium"
             current_slot = session["current_player_slot"] or "player_1"
+            levels: tuple[int, ...] | None = None
+            if level is None and collection_code is None:
+                selected_levels = list(self.sessions.enabled_levels(int(session["id"])))
+                if not bool(session["allow_level_4"]):
+                    selected_levels = [value for value in selected_levels if value != 4]
+                if not selected_levels:
+                    raise GameError("В настройке уровней по умолчанию не осталось доступных разделов")
+                levels = tuple(selected_levels)
 
             card = self.card_picker.pick(
                 PickFilter(
                     session_id=int(session["id"]),
                     level=level,
+                    levels=levels,
                     category=category,
                     intensity=intensity,
+                    collection_code=collection_code,
                     allow_level_4=bool(session["allow_level_4"]),
                     max_intensity=picker_max_intensity,
                     allow_restricted_content=bool(session["allow_restricted_content"]),
@@ -258,9 +310,9 @@ class GameService:
                 INSERT INTO turns (
                     session_id, turn_number, player_id, card_id, source, status,
                     selected_level, selected_category, selected_intensity, player_slot,
-                    selected_item_code
+                    selected_item_code, selected_collection_code
                 )
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session["id"],
@@ -273,6 +325,7 @@ class GameService:
                     intensity,
                     current_slot,
                     card.selected_item_code,
+                    collection_code,
                 ),
             )
             turn_id = int(cur.lastrowid)
@@ -297,6 +350,64 @@ class GameService:
                 (turn_id, session["id"]),
             )
         return DrawResult(turn_id, card)
+
+    def replace_active_card(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        user_id: int,
+    ) -> DrawResult:
+        chat_key = self.sessions.chat_key(chat_id, thread_id)
+        with self.db.transaction() as conn:
+            session = self.sessions.get_active(chat_key, conn)
+            if not session or not session["active_turn_id"]:
+                raise GameError("Активной карточки нет")
+            turn = conn.execute(
+                "SELECT * FROM turns WHERE id = ?",
+                (session["active_turn_id"],),
+            ).fetchone()
+            if not turn:
+                raise GameError("Активной карточки нет")
+            if int(turn["player_id"]) != int(user_id):
+                raise GameError("Сейчас ход другого игрока")
+            conn.execute(
+                "UPDATE turns SET status = 'skipped', finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (turn["id"],),
+            )
+            conn.execute(
+                """
+                UPDATE timers
+                SET status = 'cancelled'
+                WHERE turn_id = ? AND status = 'active'
+                """,
+                (turn["id"],),
+            )
+            conn.execute(
+                """
+                DELETE FROM saved_desires
+                WHERE session_id = ? AND card_id = ? AND status = 'saved'
+                """,
+                (session["id"], turn["card_id"]),
+            )
+            conn.execute(
+                "UPDATE sessions SET active_turn_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (session["id"],),
+            )
+            level = turn["selected_level"]
+            category = turn["selected_category"]
+            intensity = turn["selected_intensity"]
+            source = turn["source"]
+            collection_code = turn["selected_collection_code"]
+        return self.draw_card(
+            chat_id,
+            thread_id,
+            user_id,
+            level=int(level) if level is not None else None,
+            category=category,
+            intensity=intensity,
+            source=source,
+            collection_code=collection_code,
+        )
 
     def current_card(self, chat_id: int, thread_id: int | None) -> DrawResult | None:
         session = self.active_session(chat_id, thread_id)
@@ -372,29 +483,32 @@ class GameService:
             "allow_level_4": bool(session["allow_level_4"]),
             "max_intensity": session["max_intensity"],
             "restricted_content": bool(session["allow_restricted_content"]),
+            "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
         }
 
 
-LEVEL_NAMES = {1: "Флирт", 2: "Разогрев", 3: "Секс", 4: "BDSM"}
-CATEGORY_NAMES = {
-    "question": "Вопрос",
-    "task": "Задание",
-    "pose": "Поза",
-    "desire": "Желание",
-    "penalty": "Штраф",
-}
-INTENSITY_NAMES = {"light": "легкая", "medium": "средняя", "hard": "жесткая"}
-
-
 def format_card(card: PickedCard) -> str:
-    title = f"{LEVEL_NAMES[card.level]} · {CATEGORY_NAMES[card.category]} №{card.display_number}"
+    section = "Экстрим" if card.collection_code == "restricted_content" else LEVEL_NAMES[card.level]
+    title = f"{section} · {CATEGORY_NAMES[card.category]} №{card.display_number}"
     intensity = f"\nИнтенсивность: {INTENSITY_NAMES[card.intensity]}" if card.level >= 3 else ""
     item = ""
+    if card.required_items:
+        item_lines = []
+        for name, usage in card.required_items:
+            item_lines.append(f"• {name}")
+            if usage:
+                item_lines.append(f"  {usage}")
+        item = "\n\nОбязательный реквизит:\n" + "\n".join(item_lines)
     if card.selected_item_name:
-        item = f"\n\nРеквизит: {card.selected_item_name}."
+        item = f"\n\nРеквизит для этой карточки: {card.selected_item_name}."
         if card.selected_item_usage:
             item += f"\n{card.selected_item_usage}"
     timer = f"\n\nТаймер: {card.timer_seconds} сек." if card.timer_seconds else ""
-    aftercare = "\n\nПосле карточки нужен короткий check-in/aftercare." if card.aftercare_required else ""
+    aftercare = (
+        "\n\nПосле задания: полностью остановитесь, устройтесь удобно и по очереди скажите, "
+        "что было комфортно, что стоит изменить и что не нужно повторять."
+        if card.aftercare_required
+        else ""
+    )
     return f"{title}{intensity}\n\nЧто нужно сделать:\n{card.text}{item}{timer}{aftercare}"

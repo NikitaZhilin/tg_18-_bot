@@ -9,7 +9,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 
 from app.config import Config
-from app.handlers import admin, game, safety, start, status
+from app.handlers import admin, admin_cards, admin_items, game, safety, start, status
 from app.logging_config import configure_logging
 from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
@@ -41,6 +41,8 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)
+    dp.include_router(admin_cards.router)
+    dp.include_router(admin_items.router)
     dp.include_router(admin.router)
     dp.include_router(game.router)
     return dp
@@ -69,7 +71,12 @@ async def run_async() -> None:
 
     for seed_path in sorted(Path("content").glob("*.csv")):
         try:
-            ContentImporter(db).import_file(seed_path, content_version=f"startup_seed:{seed_path.name}", dry_run=False)
+            ContentImporter(db).import_file(
+                seed_path,
+                content_version=f"startup_seed:{seed_path.name}",
+                dry_run=False,
+                skip_existing=True,
+            )
         except Exception:
             logger.exception("startup seed import failed for %s", seed_path)
 

@@ -20,7 +20,7 @@
 | Без повторов карточек в сессии | Готово | `used_cards`, тесты |
 | Пустая выборка | Готово | game handlers |
 | `/stopword` без подтверждения | Готово | `SafetyService` |
-| Безопасный пропуск без штрафа | Готово | `game:skip`, `safe_skip` |
+| Замена карточки без передачи хода | Готово | `game:replace`, `replace_active_card` |
 | Level 4 opt-in обоими игроками | Готово | `game:level4`, `session_consents` |
 | Hard intensity opt-in обоими игроками | Готово | `game:hard`, `session_consents` |
 | Границы на сессию | Готово | `session_blocked_tags`, boundary UI |
@@ -30,18 +30,24 @@
 | Telegram-админка `/admin` | Готово | `app/handlers/admin.py` |
 | Draft/review/approve/disabled | Готово | `cards.review_status`, admin UI |
 | Preview перед сохранением | Готово | admin wizard |
-| Поиск, списки, approve/disable | Готово | admin UI |
+| Каталог раздел -> тип -> страницы по 10 | Готово | `admin_cards.py` |
+| Просмотр, редактирование, архив и удаление карточек | Готово | `admin_cards.py`, `AdminService` |
 | Редактирование и версии карточек | Готово | `card_versions`, `update_card_text` |
 | Дублирование карточек | Готово | `duplicate_card` |
 | CSV/XLSX/DOCX импорт | Готово | `ContentImporter` |
 | Dry-run импорта | Готово | `/admin`, `scripts/import_cards.py --check` |
-| Экспорт карточек | Готово | `/admin -> Экспорт` |
+| Русский XLSX с листами уровней и списками | Готово | `ExportService` |
+| Обратный импорт экспортированного XLSX | Готово | `ContentImporter` |
+| Каталог реквизита и CRUD-действия | Готово | `admin_items.py`, `ItemRepository` |
 | Возврат в админку/главное меню из админских экранов | Готово | `admin_navigation` |
 | Возврат в меню без потери активной карточки | Готово | `game:home`, `game:current`, `sessions.active_turn_id` |
 | Понятный заголовок уровня/типа/номера | Готово | `format_card`, `display_number` |
 | Динамические кнопки level 4 и hard | Готово | state-aware `main_menu`, toggle handlers |
 | Коллекции | Готово | `content_collections`, admin list |
-| Закрытые темы по админскому паролю с обратным выключением | Готово | `restricted_content`, `ADMIN_CONTENT_PASSWORD_SHA256` |
+| Отдельный «Экстрим» по админскому паролю | Готово | `restricted_content`, `ADMIN_CONTENT_PASSWORD_SHA256` |
+| Уровни общей рулетки по умолчанию | Готово | `session_enabled_levels` |
+| Стартовый seed не отменяет правки админки | Готово | `ContentImporter.skip_existing` |
+| Проверка ясности всех встроенных карточек | Готово | `test_content_clarity.py` |
 | Risk-tags и disabled для запрещенного | Готово | `ContentImporter`, `FORBIDDEN_RISK_TAGS` |
 | Позы в стиле камасутры | Готово | `content/cards.csv`, `docs/kamasutra-pose-pack.md` |
 | Целевая task-матрица 24/24/48/48 | Готово | `content/cards.csv`, тесты |
@@ -60,12 +66,12 @@ python -m compileall app scripts tests
 python -c "import os, sys, pytest; root=os.getcwd(); os.environ['TEMP']=os.path.join(root,'.tmp','temp'); os.environ['TMP']=os.environ['TEMP']; sys.exit(pytest.main(['-q','--basetemp',os.path.join(root,'.tmp','pytest')]))"
 ```
 
-Результат последней проверки: 30 тестов прошли.
+Результат последней проверки: 41 тест прошел.
 
 ## Сознательные ограничения
 
 - Токены и пароли не коммитятся.
 - Проверенные встроенные hard/level 4 seed-файлы публикуются как `approved`; внешние импорты сохраняют заданный review-статус.
-- Закрытые сложные практики требуют одновременно пароля, level 4, hard opt-in и подходящего реквизита.
+- Карточки «Экстрима» требуют одновременно пароля, level 4, hard opt-in и подходящего реквизита.
 - Запрещенные risk-tags по-прежнему автоматически отключаются и не могут быть открыты паролем.
 - Публичная web-админка не входит в MVP; Telegram-админка входит.

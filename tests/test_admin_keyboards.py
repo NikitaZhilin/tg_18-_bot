@@ -27,17 +27,29 @@ def test_admin_menu_has_main_menu_return():
 def test_restricted_button_shows_current_state():
     off_texts = [button.text for row in admin_menu(restricted_enabled=False).inline_keyboard for button in row]
     on_texts = [button.text for row in admin_menu(restricted_enabled=True).inline_keyboard for button in row]
-    assert "Закрытые темы: выключены" in off_texts
-    assert "Закрытые темы: включены" in on_texts
+    assert "Экстрим: доступ закрыт" in off_texts
+    assert "Экстрим: доступ открыт" in on_texts
 
 
 def test_game_keyboards_have_main_menu_and_dynamic_modes():
     assert "game:home" in _callbacks(level_menu())
     assert "game:home" in _callbacks(intensity_menu(3))
     assert "game:home" in _callbacks(card_actions(1, True))
-    texts = [button.text for row in main_menu(allow_level_4=True, hard_enabled=True).inline_keyboard for button in row]
+    assert "game:replace" in _callbacks(card_actions(1, True))
+    texts = [
+        button.text
+        for row in main_menu(
+            allow_level_4=True,
+            hard_enabled=True,
+            restricted_enabled=True,
+            enabled_levels=(3, 4),
+        ).inline_keyboard
+        for button in row
+    ]
     assert "Уровень 4: включен" in texts
     assert "Жесткий режим: включен" in texts
+    assert "Экстрим" in texts
+    assert any(text.startswith("Уровни по умолчанию: Секс, BDSM") for text in texts)
 
 
 def test_inventory_keyboard_displays_frequency_and_menu_return():

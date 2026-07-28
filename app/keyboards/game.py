@@ -16,6 +16,8 @@ def main_menu(
     allow_level_4: bool = False,
     hard_enabled: bool = False,
     has_active_turn: bool = False,
+    restricted_enabled: bool = False,
+    enabled_levels: tuple[int, ...] = (1, 2, 3),
 ) -> InlineKeyboardMarkup:
     rows = []
     if has_active_turn:
@@ -24,6 +26,13 @@ def main_menu(
         [
             [InlineKeyboardButton(text="Выбрать карточку", callback_data="game:menu")],
             [InlineKeyboardButton(text="Русская рулетка", callback_data="game:roulette")],
+            [
+                InlineKeyboardButton(
+                    text="Уровни по умолчанию: "
+                    + ", ".join(LEVEL_LABELS[level].split(" - ", 1)[-1] for level in enabled_levels),
+                    callback_data="game:default_levels",
+                )
+            ],
             [InlineKeyboardButton(text="Настроить реквизит", callback_data="inv:menu")],
             [InlineKeyboardButton(text="Границы на сегодня", callback_data="boundaries:menu")],
             [InlineKeyboardButton(text="Админка", callback_data="admin:menu")],
@@ -42,6 +51,11 @@ def main_menu(
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
         ]
     )
+    if restricted_enabled:
+        rows.insert(
+            2 if has_active_turn else 1,
+            [InlineKeyboardButton(text="Экстрим", callback_data="game:extreme")],
+        )
     return InlineKeyboardMarkup(
         inline_keyboard=rows
     )
@@ -56,7 +70,7 @@ def consent_menu() -> InlineKeyboardMarkup:
     )
 
 
-def level_menu(*, allow_level_4: bool = False) -> InlineKeyboardMarkup:
+def level_menu(*, allow_level_4: bool = False, restricted_enabled: bool = False) -> InlineKeyboardMarkup:
     level_rows = []
     for level, label in LEVEL_LABELS.items():
         if level == 4 and not allow_level_4:
@@ -65,8 +79,11 @@ def level_menu(*, allow_level_4: bool = False) -> InlineKeyboardMarkup:
             )
         else:
             level_rows.append([InlineKeyboardButton(text=label, callback_data=f"game:level:{level}")])
+    extra_rows = []
+    if restricted_enabled:
+        extra_rows.append([InlineKeyboardButton(text="Экстрим", callback_data="game:extreme")])
     return InlineKeyboardMarkup(
-        inline_keyboard=level_rows + [
+        inline_keyboard=level_rows + extra_rows + [
             [InlineKeyboardButton(text="Рулетка без выбора уровня", callback_data="game:roulette")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
@@ -121,12 +138,33 @@ def card_actions(turn_id: int, has_timer: bool) -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton(text="Готово", callback_data="game:done"),
-                InlineKeyboardButton(text="Пропустить", callback_data="game:skip"),
+                InlineKeyboardButton(text="Заменить карточку", callback_data="game:replace"),
             ],
             [InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")],
             [InlineKeyboardButton(text="В меню", callback_data="game:home")],
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def default_levels_menu(
+    selected: tuple[int, ...],
+    *,
+    allow_level_4: bool = False,
+) -> InlineKeyboardMarkup:
+    selected_set = set(selected)
+    rows = []
+    for level, label in LEVEL_LABELS.items():
+        if level == 4 and not allow_level_4:
+            text = f"{label}: недоступен"
+            callback_data = "game:level4"
+        else:
+            mark = "✓ " if level in selected_set else ""
+            text = f"{mark}{label}"
+            callback_data = f"game:default_level:{level}"
+        rows.append([InlineKeyboardButton(text=text, callback_data=callback_data)])
+    rows.append([InlineKeyboardButton(text="Готово", callback_data="game:home")])
+    rows.append([InlineKeyboardButton(text="Стоп-слово", callback_data="safe:stopword")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

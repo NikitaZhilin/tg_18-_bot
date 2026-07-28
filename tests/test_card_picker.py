@@ -169,12 +169,32 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
 
-    with pytest.raises(NoCardsAvailable):
-        service.draw_card(10, None, 111, level=2, category="task", intensity="light")
+    service.set_level_4_consent(10, None, 111, True)
+    service.set_level_4_consent(10, None, 222, True)
+    service.set_hard_consent(10, None, 111, True)
+    service.set_hard_consent(10, None, 222, True)
+
+    with pytest.raises(GameError, match="Экстрим"):
+        service.draw_card(
+            10,
+            None,
+            111,
+            level=None,
+            category=None,
+            collection_code="restricted_content",
+        )
 
     service.unlock_restricted_content(10, None)
-    result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
+    result = service.draw_card(
+        10,
+        None,
+        111,
+        level=None,
+        category=None,
+        collection_code="restricted_content",
+    )
     assert result.card.external_id.startswith("restricted_")
+    assert format_card(result.card).startswith("Экстрим ·")
     db.close()
 
 
@@ -233,16 +253,75 @@ def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
     service.unlock_restricted_content(10, None)
     service.set_items_for_active_session(10, None, {"gloves": 3, "lubricant": 1})
 
-    result = service.draw_card(10, None, 111, level=4, category="task", intensity="hard")
+    result = service.draw_card(
+        10,
+        None,
+        111,
+        level=None,
+        category="task",
+        collection_code="restricted_content",
+    )
     turn = db.fetchone("SELECT selected_item_code FROM turns WHERE id = ?", (result.turn_id,))
     resumed = service.current_card(10, None)
 
     assert service.items_for_active_session(10, None) == {"gloves": 3, "lubricant": 1}
-    assert result.card.selected_item_code in {"gloves", "lubricant"}
-    assert turn["selected_item_code"] == result.card.selected_item_code
+    assert {item[0] for item in result.card.required_items} == {
+        "Лубрикант",
+        "Одноразовые перчатки",
+    }
+    assert result.card.selected_item_code is None
+    assert turn["selected_item_code"] is None
     assert resumed is not None
     assert resumed.card.selected_item_code == result.card.selected_item_code
-    assert "Реквизит:" in format_card(result.card)
+    assert "Обязательный реквизит:" in format_card(result.card)
+    db.close()
+
+
+def test_replace_card_keeps_player_and_filters_but_draws_another_card(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+
+    first = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    replacement = service.replace_active_card(10, None, 111)
+
+    assert replacement.card.id != first.card.id
+    assert replacement.card.level == first.card.level == 1
+    assert replacement.card.category == first.card.category == "task"
+    status = service.status(10, None)
+    assert status["current_player_id"] == 111
+    turns = db.fetchall("SELECT status, player_id FROM turns ORDER BY id")
+    assert [(row["status"], row["player_id"]) for row in turns] == [
+        ("skipped", 111),
+        ("active", 111),
+    ]
+    db.close()
+
+
+def test_roulette_uses_session_default_levels(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+    service.set_enabled_level(10, None, 1, False)
+    service.set_enabled_level(10, None, 2, False)
+
+    result = service.draw_card(
+        10,
+        None,
+        111,
+        level=None,
+        category=None,
+        source="roulette",
+    )
+
+    assert service.enabled_levels(10, None) == (3,)
+    assert result.card.level == 3
     db.close()
 
 

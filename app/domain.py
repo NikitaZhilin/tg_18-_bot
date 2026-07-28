@@ -47,8 +47,10 @@ FORBIDDEN_RISK_TAGS = {
 class PickFilter:
     session_id: int
     level: int | None = None
+    levels: tuple[int, ...] | None = None
     category: str | None = None
     intensity: str | None = None
+    collection_code: str | None = None
     allow_level_4: bool = False
     max_intensity: str = "light"
     allow_restricted_content: bool = False
@@ -68,6 +70,9 @@ class PickedCard:
     risk_tags: tuple[str, ...]
     aftercare_required: bool
     display_number: int
+    collection_code: str | None = None
+    item_mode: str = "none"
+    required_items: tuple[tuple[str, str | None], ...] = ()
     selected_item_code: str | None = None
     selected_item_name: str | None = None
     selected_item_usage: str | None = None

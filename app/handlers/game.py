@@ -5,7 +5,16 @@ from aiogram.types import CallbackQuery
 
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
-from app.keyboards.game import boundary_menu, card_actions, category_menu, consent_menu, intensity_menu, level_menu, main_menu
+from app.keyboards.game import (
+    boundary_menu,
+    card_actions,
+    category_menu,
+    consent_menu,
+    default_levels_menu,
+    intensity_menu,
+    level_menu,
+    main_menu,
+)
 from app.keyboards.inventory import inventory_menu
 from app.services.card_picker import NoCardsAvailable
 from app.services.game_service import BASE_CONSENT_REQUIRED, GameError, GameService, format_card
@@ -35,12 +44,17 @@ def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
         allow_level_4=bool(status["allow_level_4"]),
         hard_enabled=status["max_intensity"] == "hard",
         has_active_turn=bool(status["has_active_turn"]),
+        restricted_enabled=bool(status["restricted_content"]),
+        enabled_levels=tuple(status["enabled_levels"]),
     )
 
 
 def _level_menu(game_service: GameService, chat_id: int, thread_id: int | None):
     status = game_service.status(chat_id, thread_id)
-    return level_menu(allow_level_4=bool(status.get("allow_level_4", False)))
+    return level_menu(
+        allow_level_4=bool(status.get("allow_level_4", False)),
+        restricted_enabled=bool(status.get("restricted_content", False)),
+    )
 
 
 async def _show_game_error(callback: CallbackQuery, exc: GameError) -> None:
@@ -214,6 +228,34 @@ async def cb_roulette(callback: CallbackQuery, config: Config, game_service: Gam
     await answer_callback(callback)
 
 
+@router.callback_query(F.data == "game:extreme")
+async def cb_extreme(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    try:
+        result = game_service.draw_card(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            callback.from_user.id,
+            level=None,
+            category=None,
+            intensity=None,
+            source="roulette",
+            collection_code="restricted_content",
+        )
+    except NoCardsAvailable:
+        await answer_callback(callback, "В разделе «Экстрим» не осталось подходящих карточек.", show_alert=True)
+        return
+    except GameError as exc:
+        await _show_game_error(callback, exc)
+        return
+    await callback.message.answer(
+        format_card(result.card),
+        reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
+    )
+    await answer_callback(callback)
+
+
 @router.callback_query(F.data.startswith("game:roulette_level:"))
 async def cb_roulette_level(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
@@ -259,17 +301,79 @@ async def cb_done(callback: CallbackQuery, config: Config, game_service: GameSer
     await answer_callback(callback)
 
 
+@router.callback_query(F.data == "game:replace")
 @router.callback_query(F.data == "game:skip")
-async def cb_skip(callback: CallbackQuery, config: Config, game_service: GameService, safety_service: SafetyService) -> None:
+async def cb_replace_card(
+    callback: CallbackQuery,
+    config: Config,
+    game_service: GameService,
+    safety_service: SafetyService,
+) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
     session = game_service.active_session(_chat_id(callback), callback_thread_id(callback))
     if session:
         safety_service.safe_skip(int(session["id"]), session["active_turn_id"], callback.from_user.id)
-    next_player = game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "skipped")
+    try:
+        result = game_service.replace_active_card(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            callback.from_user.id,
+        )
+    except NoCardsAvailable:
+        await callback.message.answer(
+            "Карточка заменена, но другой подходящей карточки по этим условиям не осталось.",
+            reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+        )
+        await answer_callback(callback)
+        return
+    except GameError as exc:
+        await _show_game_error(callback, exc)
+        return
     await callback.message.answer(
-        f"Карточка пропущена без штрафа. Следующий: {next_player}.",
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+        "Новая карточка:\n\n" + format_card(result.card),
+        reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data == "game:default_levels")
+async def cb_default_levels(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    status = game_service.status(_chat_id(callback), callback_thread_id(callback))
+    await callback.message.answer(
+        "Выберите уровни, из которых рулетка будет брать карточки по умолчанию:",
+        reply_markup=default_levels_menu(
+            tuple(status.get("enabled_levels", (1, 2, 3))),
+            allow_level_4=bool(status.get("allow_level_4", False)),
+        ),
+    )
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("game:default_level:"))
+async def cb_default_level(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    level = int(callback.data.split(":")[-1])
+    status = game_service.status(_chat_id(callback), callback_thread_id(callback))
+    selected = set(status.get("enabled_levels", (1, 2, 3)))
+    try:
+        updated = game_service.set_enabled_level(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            level,
+            level not in selected,
+        )
+    except GameError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await callback.message.edit_reply_markup(
+        reply_markup=default_levels_menu(
+            updated,
+            allow_level_4=bool(status.get("allow_level_4", False)),
+        )
     )
     await answer_callback(callback)
 

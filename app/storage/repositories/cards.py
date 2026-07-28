@@ -30,6 +30,7 @@ CARD_COLUMNS = [
     "requires_both_opt_in",
     "requires_safeword_check",
     "aftercare_required",
+    "item_mode",
     "is_enabled",
     "review_status",
     "notes",
@@ -112,18 +113,32 @@ class CardRepository:
         self,
         *,
         review_status: str | None = None,
+        level: int | None = None,
         category: str | None = None,
+        collection_code: str | None = None,
+        include_archived: bool = False,
         limit: int = 10,
         offset: int = 0,
     ) -> list[sqlite3.Row]:
-        where: list[str] = []
+        where: list[str] = ["deleted_at IS NULL"]
         params: list[object] = []
+        if not include_archived:
+            where.append("is_archived = 0")
         if review_status:
             where.append("review_status = ?")
             params.append(review_status)
+        if level is not None:
+            where.append("level = ?")
+            params.append(level)
         if category:
             where.append("category = ?")
             params.append(category)
+        if collection_code:
+            where.append(
+                "EXISTS (SELECT 1 FROM card_collection_items cci "
+                "WHERE cci.card_id = cards.id AND cci.collection_code = ?)"
+            )
+            params.append(collection_code)
         clause = "WHERE " + " AND ".join(where) if where else ""
         params.extend([limit, offset])
         return self.db.fetchall(
@@ -141,7 +156,8 @@ class CardRepository:
         return self.db.fetchall(
             """
             SELECT * FROM cards
-            WHERE external_id LIKE ? OR title LIKE ? OR text LIKE ?
+            WHERE deleted_at IS NULL
+              AND (external_id LIKE ? OR title LIKE ? OR text LIKE ?)
             ORDER BY updated_at DESC, created_at DESC, id DESC
             LIMIT ?
             """,
@@ -227,6 +243,69 @@ class CardRepository:
         clean["requires_both_opt_in"] = int(clean.get("requires_both_opt_in") or 0)
         clean["requires_safeword_check"] = int(clean.get("requires_safeword_check") or 0)
         clean["aftercare_required"] = int(clean.get("aftercare_required") or 0)
+        clean["item_mode"] = clean.get("item_mode") or "none"
         clean["is_enabled"] = int(clean.get("is_enabled") or 0)
         clean["review_status"] = clean.get("review_status") or "draft"
         return clean
+
+    def count_cards(
+        self,
+        *,
+        level: int | None = None,
+        category: str | None = None,
+        collection_code: str | None = None,
+        include_archived: bool = False,
+    ) -> int:
+        where = ["c.deleted_at IS NULL"]
+        params: list[object] = []
+        if not include_archived:
+            where.append("c.is_archived = 0")
+        if level is not None:
+            where.append("c.level = ?")
+            params.append(level)
+        if category:
+            where.append("c.category = ?")
+            params.append(category)
+        if collection_code:
+            where.append(
+                "EXISTS (SELECT 1 FROM card_collection_items cci "
+                "WHERE cci.card_id = c.id AND cci.collection_code = ?)"
+            )
+            params.append(collection_code)
+        row = self.db.fetchone(
+            f"SELECT COUNT(*) AS count FROM cards c WHERE {' AND '.join(where)}",
+            params,
+        )
+        return int(row["count"])
+
+    def set_archived(
+        self,
+        card_id: int,
+        archived: bool,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        executor = conn or self.db
+        executor.execute(
+            """
+            UPDATE cards
+            SET is_archived = ?,
+                is_enabled = CASE WHEN ? = 1 THEN 0 ELSE is_enabled END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND deleted_at IS NULL
+            """,
+            (1 if archived else 0, 1 if archived else 0, card_id),
+        )
+
+    def soft_delete(self, card_id: int, conn: sqlite3.Connection | None = None) -> None:
+        executor = conn or self.db
+        executor.execute(
+            """
+            UPDATE cards
+            SET deleted_at = CURRENT_TIMESTAMP,
+                is_archived = 1,
+                is_enabled = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (card_id,),
+        )

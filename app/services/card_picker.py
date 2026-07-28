@@ -23,6 +23,8 @@ class CardPicker:
         where = [
             "c.is_enabled = 1",
             "c.review_status = 'approved'",
+            "c.is_archived = 0",
+            "c.deleted_at IS NULL",
             """
             NOT EXISTS (
                 SELECT 1 FROM used_cards u
@@ -43,12 +45,27 @@ class CardPicker:
         if filters.level is not None:
             where.append("c.level = ?")
             params.append(filters.level)
+        elif filters.levels:
+            placeholders = ", ".join("?" for _ in filters.levels)
+            where.append(f"c.level IN ({placeholders})")
+            params.extend(filters.levels)
         if filters.category is not None:
             where.append("c.category = ?")
             params.append(filters.category)
         if filters.intensity is not None:
             where.append("c.intensity = ?")
             params.append(filters.intensity)
+        if filters.collection_code:
+            where.append(
+                """
+                EXISTS (
+                    SELECT 1 FROM card_collection_items selected_collection
+                    WHERE selected_collection.card_id = c.id
+                      AND selected_collection.collection_code = ?
+                )
+                """
+            )
+            params.append(filters.collection_code)
         if not filters.allow_level_4:
             where.append("c.level < 4")
         if not filters.allow_restricted_content:
@@ -85,6 +102,12 @@ class CardPicker:
                 continue
             if blocked_tags.intersection(risk_tags) or blocked_tags.intersection(avoid_if_tags):
                 continue
+            if row["item_mode"] == "required" and not self._has_eligible_item(
+                executor,
+                filters.session_id,
+                row,
+            ):
+                continue
             candidates.append(row)
 
         if not candidates:
@@ -95,13 +118,18 @@ class CardPicker:
             for _ in range(self._card_weight(executor, filters.session_id, int(row["id"])))
         ]
         row = self.rng.choice(weighted_candidates)
-        return self._row_to_card(row, filters.session_id, executor)
+        return self._row_to_card(
+            row,
+            filters.session_id,
+            executor,
+            collection_code=filters.collection_code,
+        )
 
     def for_turn(self, turn_id: int, conn: sqlite3.Connection | None = None) -> PickedCard | None:
         executor = conn or self.db
         row = executor.execute(
             """
-            SELECT c.*, t.session_id, t.selected_item_code
+            SELECT c.*, t.session_id, t.selected_item_code, t.selected_collection_code
             FROM turns t
             JOIN cards c ON c.id = t.card_id
             WHERE t.id = ?
@@ -116,6 +144,7 @@ class CardPicker:
             executor,
             row["selected_item_code"],
             choose_item=False,
+            collection_code=row["selected_collection_code"],
         )
 
     def _row_to_card(
@@ -125,22 +154,38 @@ class CardPicker:
         executor: sqlite3.Connection | Database,
         selected_item_code: str | None = None,
         choose_item: bool = True,
+        collection_code: str | None = None,
     ) -> PickedCard:
+        required_items = self._required_items(executor, int(row["id"]))
         item = self._item_by_code(executor, selected_item_code) if selected_item_code else None
-        if item is None and choose_item:
+        if item is None and choose_item and not required_items and row["item_mode"] != "none":
             item = self._pick_item(executor, session_id, row)
-        display_number = int(
-            executor.execute(
+        if collection_code:
+            display_number_row = executor.execute(
+                """
+                SELECT COUNT(*) AS number
+                FROM cards numbered
+                JOIN card_collection_items cci ON cci.card_id = numbered.id
+                WHERE cci.collection_code = ?
+                  AND numbered.category = ?
+                  AND numbered.deleted_at IS NULL
+                  AND numbered.id <= ?
+                """,
+                (collection_code, row["category"], row["id"]),
+            ).fetchone()
+        else:
+            display_number_row = executor.execute(
                 """
                 SELECT COUNT(*) AS number
                 FROM cards numbered
                 WHERE numbered.level = ?
                   AND numbered.category = ?
+                  AND numbered.deleted_at IS NULL
                   AND numbered.id <= ?
                 """,
                 (row["level"], row["category"], row["id"]),
-            ).fetchone()["number"]
-        )
+            ).fetchone()
+        display_number = int(display_number_row["number"])
         return PickedCard(
             id=int(row["id"]),
             external_id=row["external_id"],
@@ -154,6 +199,11 @@ class CardPicker:
             risk_tags=tuple(parse_json_list(row["risk_tags"])),
             aftercare_required=int_to_bool(row["aftercare_required"]),
             display_number=display_number,
+            collection_code=collection_code,
+            item_mode=row["item_mode"],
+            required_items=tuple(
+                (required["name"], required["usage_text"]) for required in required_items
+            ),
             selected_item_code=item["code"] if item else None,
             selected_item_name=item["name"] if item else None,
             selected_item_usage=item["usage_text"] if item else None,
@@ -175,6 +225,8 @@ class CardPicker:
               ON cri.card_id = ? AND cri.item_code = i.code
             WHERE si.session_id = ?
               AND i.is_active = 1
+              AND i.is_archived = 0
+              AND i.deleted_at IS NULL
               AND ? BETWEEN i.min_level AND i.max_level
               AND instr(',' || i.categories || ',', ',' || ? || ',') > 0
               AND (i.randomizable = 1 OR cri.item_code IS NOT NULL)
@@ -184,9 +236,9 @@ class CardPicker:
         ).fetchall()
         if not rows:
             return None
-        required = [row for row in rows if int(row["is_required"])]
-        if required:
-            return self.rng.choice(required)
+        if card["item_mode"] == "required":
+            weighted = [row for row in rows for _ in range(int(row["frequency"]))]
+            return self.rng.choice(weighted)
         eligible = [
             row
             for row in rows
@@ -196,6 +248,36 @@ class CardPicker:
             return None
         weighted = [row for row in eligible for _ in range(int(row["frequency"]))]
         return self.rng.choice(weighted)
+
+    def _has_eligible_item(
+        self,
+        executor: sqlite3.Connection | Database,
+        session_id: int,
+        card: sqlite3.Row,
+    ) -> bool:
+        required = executor.execute(
+            "SELECT 1 FROM card_required_items WHERE card_id = ? LIMIT 1",
+            (card["id"],),
+        ).fetchone()
+        if required:
+            return True
+        row = executor.execute(
+            """
+            SELECT 1
+            FROM session_items si
+            JOIN items i ON i.code = si.item_code
+            WHERE si.session_id = ?
+              AND i.is_active = 1
+              AND i.is_archived = 0
+              AND i.deleted_at IS NULL
+              AND i.randomizable = 1
+              AND ? BETWEEN i.min_level AND i.max_level
+              AND instr(',' || i.categories || ',', ',' || ? || ',') > 0
+            LIMIT 1
+            """,
+            (session_id, card["level"], card["category"]),
+        ).fetchone()
+        return row is not None
 
     @staticmethod
     def _card_weight(executor: sqlite3.Connection | Database, session_id: int, card_id: int) -> int:
@@ -217,3 +299,21 @@ class CardPicker:
             "SELECT code, name, usage_text FROM items WHERE code = ?",
             (code,),
         ).fetchone()
+
+    @staticmethod
+    def _required_items(
+        executor: sqlite3.Connection | Database,
+        card_id: int,
+    ) -> list[sqlite3.Row]:
+        return list(
+            executor.execute(
+                """
+                SELECT i.code, i.name, i.usage_text
+                FROM card_required_items cri
+                JOIN items i ON i.code = cri.item_code
+                WHERE cri.card_id = ?
+                ORDER BY i.name
+                """,
+                (card_id,),
+            ).fetchall()
+        )

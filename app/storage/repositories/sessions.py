@@ -65,7 +65,12 @@ class SessionRepository:
                 1 if allow_level_4 else 0,
             ),
         )
-        return int(cur.lastrowid)
+        session_id = int(cur.lastrowid)
+        self.db.executemany(
+            "INSERT OR IGNORE INTO session_enabled_levels (session_id, level) VALUES (?, ?)",
+            [(session_id, 1), (session_id, 2), (session_id, 3)],
+        )
+        return session_id
 
     def set_items(self, session_id: int, items: dict[str, int]) -> None:
         with self.db.transaction() as conn:
@@ -127,6 +132,30 @@ class SessionRepository:
         self.db.execute(
             "UPDATE sessions SET allow_restricted_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (1 if enabled else 0, session_id),
+        )
+
+    def enabled_levels(self, session_id: int) -> tuple[int, ...]:
+        rows = self.db.fetchall(
+            """
+            SELECT level
+            FROM session_enabled_levels
+            WHERE session_id = ?
+            ORDER BY level
+            """,
+            (session_id,),
+        )
+        return tuple(int(row["level"]) for row in rows)
+
+    def set_enabled_level(self, session_id: int, level: int, enabled: bool) -> None:
+        if enabled:
+            self.db.execute(
+                "INSERT OR IGNORE INTO session_enabled_levels (session_id, level) VALUES (?, ?)",
+                (session_id, level),
+            )
+            return
+        self.db.execute(
+            "DELETE FROM session_enabled_levels WHERE session_id = ? AND level = ?",
+            (session_id, level),
         )
 
     def finish_session(self, session_id: int, status: str, reason: str | None = None) -> None:

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import csv
+from pathlib import Path
+
+from app.services.content_importer import ContentImporter
 from tests.helpers import import_restricted_seed, import_seed, migrated_db
 
 
@@ -51,4 +55,54 @@ def test_restricted_content_imports_into_closed_collection(tmp_path):
         """
     )
     assert row["count"] == 18
+    db.close()
+
+
+def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    db.execute(
+        """
+        UPDATE cards
+        SET text = 'Текст, измененный администратором'
+        WHERE external_id = 'task_l1_001'
+        """
+    )
+
+    report = ContentImporter(db).import_file(
+        Path("content/cards.csv"),
+        dry_run=False,
+        skip_existing=True,
+    )
+
+    card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
+    assert card["text"] == "Текст, измененный администратором"
+    assert report.added_or_updated == 0
+    db.close()
+
+
+def test_import_rejects_unknown_item_reference(tmp_path):
+    db = migrated_db(tmp_path)
+    path = tmp_path / "unknown_item.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["external_id", "level", "category", "text", "required_items"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "external_id": "test_unknown_item",
+                "level": 1,
+                "category": "task",
+                "text": "Понятный тестовый текст карточки.",
+                "required_items": "missing_item",
+            }
+        )
+
+    report = ContentImporter(db).import_file(path, dry_run=True)
+
+    assert report.added_or_updated == 0
+    assert report.warnings_count == 1
+    assert "Неизвестный реквизит" in report.warnings[0].message
     db.close()
