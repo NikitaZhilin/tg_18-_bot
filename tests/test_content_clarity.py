@@ -13,6 +13,13 @@ def _content_rows():
     return rows
 
 
+def test_all_cards_pass_full_content_audit():
+    from scripts.audit_card_content import audit
+
+    failures = audit(_content_rows())
+    assert {name: entries for name, entries in failures.items() if entries} == {}
+
+
 def test_content_has_no_internal_english_or_numbered_placeholders():
     forbidden_fragments = {
         "check-in",

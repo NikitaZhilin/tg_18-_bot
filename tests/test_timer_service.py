@@ -9,9 +9,17 @@ from app.services.timer_service import TimerService
 from tests.helpers import import_seed, make_config, migrated_db
 
 
+def enable_one_timed_card(db) -> None:
+    db.execute("UPDATE cards SET is_enabled = 0")
+    db.execute(
+        "UPDATE cards SET is_enabled = 1 WHERE external_id = 'task_l1_015'"
+    )
+
+
 def test_due_timer_sends_telegram_message(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    enable_one_timed_card(db)
     game = GameService(db, make_config(tmp_path))
     game.ensure_session(10, 77)
     game.accept_base_consent(10, 77, 111)
@@ -37,6 +45,7 @@ def test_due_timer_sends_telegram_message(tmp_path):
 def test_failed_timer_notification_is_retried_later(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    enable_one_timed_card(db)
     game = GameService(db, make_config(tmp_path))
     game.ensure_session(10, None)
     game.accept_base_consent(10, None, 111)
@@ -63,6 +72,7 @@ def test_failed_timer_notification_is_retried_later(tmp_path):
 def test_timer_requires_active_turn_and_current_player(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    enable_one_timed_card(db)
     game = GameService(db, make_config(tmp_path))
     game.ensure_session(10, None)
     game.accept_base_consent(10, None, 111)
