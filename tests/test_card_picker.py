@@ -212,7 +212,7 @@ def test_card_header_uses_level_category_and_section_number(tmp_path):
     result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
     text = format_card(result.card)
 
-    assert text.startswith("Разогрев · Задание №21")
+    assert text.startswith("Разогрев · Задание №20")
     assert "Что нужно сделать:" in text
     assert "Уровень 2 - 21" not in text
     assert "дышит в собственном обычном ритме" in text

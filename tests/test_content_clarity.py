@@ -80,7 +80,7 @@ def test_extreme_sheet_content_is_consistently_gated():
         newline="",
     ) as source:
         rows = list(csv.DictReader(source))
-    assert len(rows) == 22
+    assert len(rows) == 20
     for row in rows:
         assert row["level"] == "4"
         assert row["intensity"] == "hard"
@@ -89,7 +89,7 @@ def test_extreme_sheet_content_is_consistently_gated():
 
     active = [row for row in rows if row["review_status"] == "approved"]
     drafts = [row for row in rows if row["review_status"] == "draft"]
-    assert len(active) == 19
+    assert len(active) == 17
     assert all(row["is_enabled"] == "1" for row in active)
     assert {
         row["external_id"] for row in drafts
@@ -111,8 +111,8 @@ def test_extreme_cards_have_titles_and_actionable_structure():
 
     required_markers = {
         "question": ("контекст:", "ответьте:", "итог:"),
-        "task": ("контекст:", "порядок:", "завершение:"),
-        "pose": ("исходное положение:", "назначение:", "действие:", "завершение:"),
+        "task": ("порядок:", "завершение:"),
+        "pose": ("исходное положение:", "действие:", "завершение:"),
         "desire": ("контекст:", "сейчас:", "использование:", "завершение:"),
     }
     failures = []
@@ -128,8 +128,8 @@ def test_extreme_cards_have_titles_and_actionable_structure():
 def test_every_card_has_one_complete_category_specific_structure():
     required_markers = {
         "question": ("Контекст:", "Ответьте:", "Итог:"),
-        "task": ("Контекст:", "Порядок:", "Завершение:"),
-        "pose": ("Исходное положение:", "Назначение:", "Действие:", "Завершение:"),
+        "task": ("Порядок:", "Завершение:"),
+        "pose": ("Исходное положение:", "Действие:", "Завершение:"),
         "desire": ("Контекст:", "Сейчас:", "Использование:", "Завершение:"),
         "penalty": ("Контекст:", "Выполнение:", "Завершение:"),
     }
@@ -372,6 +372,71 @@ def test_builtin_titles_and_texts_are_not_duplicated():
             grouped.setdefault(row[field].strip().casefold(), []).append(row["external_id"])
         duplicates = [ids for value, ids in grouped.items() if value and len(ids) > 1]
         assert duplicates == []
+
+
+def test_owner_reviewed_duplicates_do_not_return():
+    removed_ids = {
+        "task_l1_010",
+        "task_l1_011",
+        "task_l1_018",
+        "task_l1_020",
+        "task_l1_021",
+        "task_l1_023",
+        "task_l2_004",
+        "task_l4_hard_004",
+        "task_l4_hard_014",
+        "task_l4_medium_008",
+        "task_l4_medium_016",
+        "pose_ks_031",
+        "pose_ks_035",
+        "penalty_seed_002",
+        "restricted_l4_hard_urethral_002",
+        "restricted_q_002",
+    }
+    current_ids = {row["external_id"] for row in _content_rows()}
+    assert removed_ids.isdisjoint(current_ids)
+
+
+def test_cards_do_not_repeat_structural_sections_or_generic_references():
+    failures = []
+    forbidden = (
+        "После выполнения всех пунктов раздела «Порядок»",
+        "Выполняйте последовательность",
+        "Используйте эту последовательность",
+        "Начните последовательность",
+        "выполните точную последовательность",
+        "Продолжайте только это действие до сигнала таймера",
+    )
+    for row in _content_rows():
+        text = row["text"]
+        repeated = [phrase for phrase in forbidden if phrase in text]
+        if repeated:
+            failures.append((row["external_id"], repeated))
+        if row["category"] == "pose" and "Назначение:" in text:
+            failures.append((row["external_id"], ["Назначение повторяет действие"]))
+        if row["category"] == "task":
+            paragraphs = text.split("\n\n")
+            context = next(
+                (
+                    part.removeprefix("Контекст:").strip()
+                    for part in paragraphs
+                    if part.startswith("Контекст:")
+                ),
+                None,
+            )
+            order = next(
+                (
+                    part.removeprefix("Порядок:").strip()
+                    for part in paragraphs
+                    if part.startswith("Порядок:")
+                ),
+                None,
+            )
+            if context and order and context == order:
+                failures.append(
+                    (row["external_id"], ["Контекст дословно повторяет порядок"])
+                )
+    assert failures == []
 
 
 def test_explicit_card_durations_match_telegram_timers():

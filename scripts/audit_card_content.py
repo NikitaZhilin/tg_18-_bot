@@ -13,10 +13,9 @@ CONTENT_FILES = (
 
 CATEGORY_MARKERS = {
     "question": ("Контекст:", "Ответьте:", "Итог:"),
-    "task": ("Контекст:", "Порядок:", "Завершение:"),
+    "task": ("Порядок:", "Завершение:"),
     "pose": (
         "Исходное положение:",
-        "Назначение:",
         "Действие:",
         "Завершение:",
     ),
@@ -41,6 +40,12 @@ FORBIDDEN_PHRASES = (
     "из раздела «порядок»",
     "в разделе «порядок»",
     "из раздела «выполнение»",
+    "после выполнения всех пунктов раздела «порядок»",
+    "выполняйте последовательность",
+    "используйте эту последовательность",
+    "начните последовательность",
+    "выполните точную последовательность",
+    "продолжайте только это действие до сигнала таймера",
 )
 
 ACTIVITY_MARKERS = (
@@ -49,6 +54,7 @@ ACTIVITY_MARKERS = (
     "массаж",
     "глад",
     "касани",
+    "каса",
     "прикоснов",
     "ручн",
     "оральн",
@@ -63,6 +69,9 @@ ACTIVITY_MARKERS = (
     "проникнов",
     "команд",
     "один шаг",
+    "положен",
+    "дистанц",
+    "движен",
     "взгляд",
 )
 
@@ -140,17 +149,13 @@ def audit(rows: list[dict[str, str]]) -> dict[str, list[str]]:
             )
 
         if category == "pose":
-            purpose = section(text, "Назначение:").casefold()
             action = section(text, "Действие:").casefold()
-            purpose_activities = {
-                marker for marker in ACTIVITY_MARKERS if marker in purpose
-            }
             action_activities = {
                 marker for marker in ACTIVITY_MARKERS if marker in action
             }
-            if purpose_activities and not purpose_activities & action_activities:
+            if not action_activities:
                 failures["pose_action"].append(
-                    f"{external_id}: действие не повторяет назначение"
+                    f"{external_id}: в действии не названа конкретная активность"
                 )
 
     for field in ("title", "text"):
