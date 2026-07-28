@@ -26,3 +26,24 @@ def test_stopword_stops_session_turn_and_timer(tmp_path):
     assert timer["status"] == "cancelled"
     assert event is not None
     db.close()
+
+
+def test_manual_reset_stops_turn_and_cancels_timer(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    game = GameService(db, make_config(tmp_path))
+    game.ensure_session(10, None)
+    game.accept_base_consent(10, None, 111)
+    game.accept_base_consent(10, None, 222)
+    result = game.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    TimerService(db).start_for_turn(result.turn_id, 111)
+
+    game.reset_session(10, None)
+
+    session = db.fetchone("SELECT status FROM sessions WHERE id = 1")
+    turn = db.fetchone("SELECT status FROM turns WHERE id = ?", (result.turn_id,))
+    timer = db.fetchone("SELECT status FROM timers WHERE turn_id = ?", (result.turn_id,))
+    assert session["status"] == "reset"
+    assert turn["status"] == "stopped"
+    assert timer["status"] == "cancelled"
+    db.close()

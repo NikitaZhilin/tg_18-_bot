@@ -21,14 +21,19 @@ class TimerService:
             SELECT t.*, c.timer_seconds
             FROM turns t
             JOIN cards c ON c.id = t.card_id
+            JOIN sessions s ON s.id = t.session_id
             WHERE t.id = ?
+              AND t.status = 'active'
+              AND s.status IN ('draft', 'active')
             """,
             (turn_id,),
         )
         if not turn:
-            raise ValueError("turn not found")
+            raise ValueError("Карточка уже завершена или недоступна")
+        if int(turn["player_id"]) != int(started_by):
+            raise ValueError("Таймер может запустить только текущий игрок")
         if not turn["timer_seconds"]:
-            raise ValueError("card has no timer")
+            raise ValueError("У этой карточки нет таймера")
         existing = self.timers.active_for_turn(turn_id)
         if existing:
             return int(existing["id"])
@@ -40,17 +45,21 @@ class TimerService:
             int(turn["timer_seconds"]),
         )
 
-    async def process_due_timers(self, notify: Callable[[int, str], Awaitable[None]]) -> None:
+    async def process_due_timers(
+        self,
+        notify: Callable[[int, str, int | None], Awaitable[None]],
+    ) -> None:
         for timer in self.timers.due():
-            self.timers.mark_completed(int(timer["id"]))
             session = self.db.fetchone("SELECT chat_key FROM sessions WHERE id = ?", (timer["session_id"],))
             if session:
-                chat_id = int(str(session["chat_key"]).split(":", 1)[0])
-                await notify(chat_id, "Время вышло.")
+                chat_raw, thread_raw = str(session["chat_key"]).split(":", 1)
+                thread_id = int(thread_raw) or None
+                await notify(int(chat_raw), "Время вышло.", thread_id)
+                self.timers.mark_completed(int(timer["id"]))
 
     async def run_due_loop(
         self,
-        notify: Callable[[int, str], Awaitable[None]],
+        notify: Callable[[int, str, int | None], Awaitable[None]],
         *,
         poll_seconds: int = 5,
     ) -> None:

@@ -26,6 +26,8 @@
 | Границы на сессию | Готово | `session_blocked_tags`, boundary UI |
 | Persisted timers | Готово | `timers`, `TimerService` |
 | Telegram-уведомление "Время вышло" | Готово | `TimerService.process_due_timers` |
+| Повтор уведомления после временной ошибки Telegram | Готово | timer остается `active` до успешной отправки |
+| Отмена таймера при завершении карточки и reset | Готово | `GameService.finish_turn`, `reset_session` |
 | Desire-купоны | Готово | `saved_desires` |
 | Telegram-админка `/admin` | Готово | `app/handlers/admin.py` |
 | Draft/review/approve/disabled | Готово | `cards.review_status`, admin UI |
@@ -46,7 +48,9 @@
 | Коллекции | Готово | `content_collections`, admin list |
 | Отдельный «Экстрим» по админскому паролю | Готово | `restricted_content`, `ADMIN_CONTENT_PASSWORD_SHA256` |
 | Уровни общей рулетки по умолчанию | Готово | `session_enabled_levels` |
-| Стартовый seed не отменяет правки админки | Готово | `ContentImporter.skip_existing` |
+| Стартовый seed не отменяет правки админки | Готово | `preserve_admin_changes`, `card_versions` |
+| Новая версия seed обновляет неизмененные серверные карточки один раз | Готово | hash-версия seed, `preserve_admin_changes` |
+| Повторное «Готово» не переключает очередь второй раз | Готово | проверка активного turn и текущего игрока |
 | Проверка ясности всех встроенных карточек | Готово | `test_content_clarity.py` |
 | Risk-tags и disabled для запрещенного | Готово | `ContentImporter`, `FORBIDDEN_RISK_TAGS` |
 | Позы в стиле камасутры | Готово | `content/cards.csv`, `docs/kamasutra-pose-pack.md` |
@@ -66,7 +70,7 @@ python -m compileall app scripts tests
 python -c "import os, sys, pytest; root=os.getcwd(); os.environ['TEMP']=os.path.join(root,'.tmp','temp'); os.environ['TMP']=os.environ['TEMP']; sys.exit(pytest.main(['-q','--basetemp',os.path.join(root,'.tmp','pytest')]))"
 ```
 
-Результат последней проверки: 41 тест прошел.
+Результат последней проверки: 49 тестов прошли.
 
 ## Сознательные ограничения
 

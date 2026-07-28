@@ -24,11 +24,14 @@ class AdminService:
         required_items: list[str] | None = None,
         collections: list[str] | None = None,
     ) -> int:
+        required_items = required_items or []
+        if required_items:
+            card_data = {**card_data, "item_mode": "required"}
         with self.db.transaction() as conn:
             existing = self.cards.get_by_external_id(str(card_data.get("external_id")), conn)
             if existing:
                 self.cards.save_version(int(existing["id"]), admin_user_id, "admin_update", conn)
-            card_id = self.cards.upsert(card_data, required_items or [], collections or [], conn)
+            card_id = self.cards.upsert(card_data, required_items, collections or [], conn)
             action = "update_card" if existing else "create_card"
             conn.execute(
                 """
@@ -148,6 +151,13 @@ class AdminService:
         if field == "timer_seconds":
             value = int(value) if value not in (None, "", "0", 0) else None
         with self.db.transaction() as conn:
+            if field == "item_mode" and value == "none":
+                has_items = conn.execute(
+                    "SELECT 1 FROM card_required_items WHERE card_id = ? LIMIT 1",
+                    (card_id,),
+                ).fetchone()
+                if has_items:
+                    raise ValueError("Сначала уберите обязательный реквизит из карточки")
             self.cards.save_version(card_id, admin_user_id, f"edit_{field}", conn)
             conn.execute(
                 f"""
@@ -198,10 +208,13 @@ class AdminService:
             conn.execute(
                 """
                 UPDATE cards
-                SET review_status = 'draft', is_enabled = 0, updated_at = CURRENT_TIMESTAMP
+                SET item_mode = ?,
+                    review_status = 'draft',
+                    is_enabled = 0,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (card_id,),
+                ("required" if codes else "none", card_id),
             )
 
     def list_catalog(

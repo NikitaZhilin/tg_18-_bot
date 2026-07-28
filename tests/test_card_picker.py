@@ -161,6 +161,25 @@ def test_roulette_does_not_repeat_used_cards_in_session(tmp_path):
     db.close()
 
 
+def test_finishing_turn_is_idempotent_and_restricted_to_current_player(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    service.accept_base_consent(10, None, 111)
+    service.accept_base_consent(10, None, 222)
+    service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+
+    with pytest.raises(GameError, match="другого игрока"):
+        service.finish_turn(10, None, 222)
+
+    assert service.finish_turn(10, None, 111) == "B"
+    with pytest.raises(GameError, match="Активной карточки нет"):
+        service.finish_turn(10, None, 111)
+    assert service.status(10, None)["current_player_id"] == 222
+    db.close()
+
+
 def test_restricted_cards_require_session_unlock(tmp_path):
     db = migrated_db(tmp_path)
     import_restricted_seed(db)

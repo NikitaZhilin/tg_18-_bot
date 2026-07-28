@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from app.services.content_importer import ContentImporter
+from app.storage.repositories.cards import CardRepository
 from tests.helpers import import_restricted_seed, import_seed, migrated_db
 
 
@@ -61,6 +62,8 @@ def test_restricted_content_imports_into_closed_collection(tmp_path):
 def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
+    card = db.fetchone("SELECT id FROM cards WHERE external_id = 'task_l1_001'")
+    CardRepository(db).save_version(int(card["id"]), None, "admin_edit")
     db.execute(
         """
         UPDATE cards
@@ -72,12 +75,57 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
     report = ContentImporter(db).import_file(
         Path("content/cards.csv"),
         dry_run=False,
-        skip_existing=True,
+        preserve_admin_changes=True,
     )
 
     card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
     assert card["text"] == "Текст, измененный администратором"
-    assert report.added_or_updated == 0
+    assert report.added_or_updated == 195
+    db.close()
+
+
+def test_startup_seed_updates_unmodified_built_in_cards(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    db.execute(
+        """
+        UPDATE cards
+        SET text = 'Старый текст из предыдущей версии'
+        WHERE external_id = 'task_l1_001'
+        """
+    )
+
+    ContentImporter(db).import_file(
+        Path("content/cards.csv"),
+        dry_run=False,
+        preserve_admin_changes=True,
+    )
+
+    card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
+    assert card["text"] != "Старый текст из предыдущей версии"
+    db.close()
+
+
+def test_startup_seed_version_is_applied_only_once(tmp_path):
+    db = migrated_db(tmp_path)
+    importer = ContentImporter(db)
+    version = "startup_seed:test:abc"
+
+    first = importer.import_file(
+        Path("content/cards.csv"),
+        content_version=version,
+        dry_run=False,
+        skip_imported_version=True,
+    )
+    second = importer.import_file(
+        Path("content/cards.csv"),
+        content_version=version,
+        dry_run=False,
+        skip_imported_version=True,
+    )
+
+    assert first.added_or_updated == 196
+    assert second.added_or_updated == 0
     db.close()
 
 
@@ -87,7 +135,14 @@ def test_import_rejects_unknown_item_reference(tmp_path):
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=["external_id", "level", "category", "text", "required_items"],
+            fieldnames=[
+                "external_id",
+                "level",
+                "category",
+                "text",
+                "required_items",
+                "item_mode",
+            ],
         )
         writer.writeheader()
         writer.writerow(
@@ -97,6 +152,7 @@ def test_import_rejects_unknown_item_reference(tmp_path):
                 "category": "task",
                 "text": "Понятный тестовый текст карточки.",
                 "required_items": "missing_item",
+                "item_mode": "required",
             }
         )
 
@@ -105,4 +161,39 @@ def test_import_rejects_unknown_item_reference(tmp_path):
     assert report.added_or_updated == 0
     assert report.warnings_count == 1
     assert "Неизвестный реквизит" in report.warnings[0].message
+    db.close()
+
+
+def test_import_rejects_explicit_item_with_disabled_item_mode(tmp_path):
+    db = migrated_db(tmp_path)
+    path = tmp_path / "inconsistent_item_mode.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "external_id",
+                "level",
+                "category",
+                "text",
+                "required_items",
+                "item_mode",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "external_id": "test_inconsistent_item_mode",
+                "level": 2,
+                "category": "task",
+                "text": "Используйте выбранную повязку только согласованным способом.",
+                "required_items": "blindfold",
+                "item_mode": "none",
+            }
+        )
+
+    report = ContentImporter(db).import_file(path, dry_run=True)
+
+    assert report.added_or_updated == 0
+    assert report.warnings_count == 1
+    assert "Обязательно подобрать" in report.warnings[0].message
     db.close()

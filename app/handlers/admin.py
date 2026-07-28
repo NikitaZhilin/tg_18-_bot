@@ -226,7 +226,7 @@ async def cb_admin_items(
             return
         await state.update_data(
             required_items=sorted(selected) if value == "done" else [],
-            item_mode=value if value in {"optional", "required"} else "none",
+            item_mode="required" if value == "done" else value if value in {"optional", "required"} else "none",
         )
         await state.set_state(AdminAddCard.timer)
         await callback.message.answer("Выберите длительность:", reply_markup=timer_choice())
@@ -268,7 +268,7 @@ async def msg_admin_items(
         return
     await state.update_data(
         required_items=[lookup[item.casefold()] for item in raw_items],
-        item_mode="none",
+        item_mode="required",
     )
     await state.set_state(AdminAddCard.timer)
     await message.answer("Введите длительность в секундах или «-» без таймера.", reply_markup=admin_navigation())

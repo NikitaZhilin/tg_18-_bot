@@ -293,7 +293,16 @@ async def cb_roulette_level(callback: CallbackQuery, config: Config, game_servic
 async def cb_done(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):
         return
-    next_player = game_service.finish_turn(_chat_id(callback), callback_thread_id(callback), callback.from_user.id, "completed")
+    try:
+        next_player = game_service.finish_turn(
+            _chat_id(callback),
+            callback_thread_id(callback),
+            callback.from_user.id,
+            "completed",
+        )
+    except GameError as exc:
+        await _show_game_error(callback, exc)
+        return
     await callback.message.answer(
         f"Ход завершен. Следующий: {next_player}.",
         reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
@@ -312,8 +321,8 @@ async def cb_replace_card(
     if await reject_callback_if_not_allowed(callback, config):
         return
     session = game_service.active_session(_chat_id(callback), callback_thread_id(callback))
-    if session:
-        safety_service.safe_skip(int(session["id"]), session["active_turn_id"], callback.from_user.id)
+    session_id = int(session["id"]) if session else None
+    turn_id = int(session["active_turn_id"]) if session and session["active_turn_id"] else None
     try:
         result = game_service.replace_active_card(
             _chat_id(callback),
@@ -321,6 +330,8 @@ async def cb_replace_card(
             callback.from_user.id,
         )
     except NoCardsAvailable:
+        if session_id:
+            safety_service.safe_skip(session_id, turn_id, callback.from_user.id)
         await callback.message.answer(
             "Карточка заменена, но другой подходящей карточки по этим условиям не осталось.",
             reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
@@ -330,6 +341,8 @@ async def cb_replace_card(
     except GameError as exc:
         await _show_game_error(callback, exc)
         return
+    if session_id:
+        safety_service.safe_skip(session_id, turn_id, callback.from_user.id)
     await callback.message.answer(
         "Новая карточка:\n\n" + format_card(result.card),
         reply_markup=card_actions(result.turn_id, bool(result.card.timer_seconds)),
@@ -389,7 +402,7 @@ async def cb_timer(callback: CallbackQuery, config: Config, timer_service: Timer
         await answer_callback(callback, str(exc), show_alert=True)
         return
     await callback.message.answer(
-        f"Таймер запущен. ID: {timer_id}",
+        "Таймер запущен. Бот сообщит, когда время закончится.",
         reply_markup=card_actions(turn_id, False),
     )
     await answer_callback(callback)

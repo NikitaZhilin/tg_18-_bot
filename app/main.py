@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from pathlib import Path
 
@@ -71,11 +72,13 @@ async def run_async() -> None:
 
     for seed_path in sorted(Path("content").glob("*.csv")):
         try:
+            digest = hashlib.sha256(seed_path.read_bytes()).hexdigest()[:16]
             ContentImporter(db).import_file(
                 seed_path,
-                content_version=f"startup_seed:{seed_path.name}",
+                content_version=f"startup_seed:{seed_path.name}:{digest}",
                 dry_run=False,
-                skip_existing=True,
+                preserve_admin_changes=True,
+                skip_imported_version=True,
             )
         except Exception:
             logger.exception("startup seed import failed for %s", seed_path)
@@ -95,7 +98,11 @@ async def run_async() -> None:
     timer_service = services["timer_service"]
     assert isinstance(timer_service, TimerService)
     heartbeat_task = asyncio.create_task(_heartbeat_loop(db))
-    timer_task = asyncio.create_task(timer_service.run_due_loop(bot.send_message))
+
+    async def notify_timer(chat_id: int, text: str, thread_id: int | None) -> None:
+        await bot.send_message(chat_id, text, message_thread_id=thread_id)
+
+    timer_task = asyncio.create_task(timer_service.run_due_loop(notify_timer))
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

@@ -90,8 +90,17 @@ class ContentImporter:
         dry_run: bool = False,
         admin_user_id: int | None = None,
         skip_existing: bool = False,
+        preserve_admin_changes: bool = False,
+        skip_imported_version: bool = False,
     ) -> ImportReport:
         path = Path(path)
+        report = ImportReport(str(path), content_version, dry_run=dry_run)
+        if skip_imported_version and self.db.fetchone(
+            "SELECT 1 FROM content_imports WHERE content_version = ? LIMIT 1",
+            (content_version,),
+        ):
+            return report
+
         item_rows: list[dict[str, Any]] = []
         if path.suffix.lower() == ".csv":
             rows = self._read_csv(path)
@@ -102,7 +111,6 @@ class ContentImporter:
         else:
             raise ValueError(f"unsupported content file: {path.suffix}")
 
-        report = ImportReport(str(path), content_version, dry_run=dry_run)
         prepared_rows: list[tuple[dict[str, Any], list[str], list[str]]] = []
         trusted_seed = path.parent.resolve() == Path("content").resolve()
         existing_external_ids = {
@@ -111,6 +119,17 @@ class ContentImporter:
                 "SELECT external_id FROM cards WHERE external_id IS NOT NULL"
             )
         }
+        admin_modified_external_ids = {
+            str(row["external_id"])
+            for row in self.db.fetchall(
+                """
+                SELECT DISTINCT c.external_id
+                FROM cards c
+                JOIN card_versions cv ON cv.card_id = c.id
+                WHERE c.external_id IS NOT NULL
+                """
+            )
+        } if preserve_admin_changes else set()
         known_item_codes = {
             str(row["code"])
             for row in self.db.fetchall(
@@ -126,6 +145,8 @@ class ContentImporter:
         for index, row in enumerate(rows, start=2):
             external_id = str(row.get("external_id") or "").strip()
             if skip_existing and external_id in existing_external_ids:
+                continue
+            if external_id in admin_modified_external_ids:
                 continue
             if trusted_seed:
                 row["_trusted_seed"] = "1"
@@ -382,6 +403,10 @@ class ContentImporter:
             "_is_archived": 1 if _to_bool(row.get("_is_archived")) else 0,
         }
         items = parse_json_list(row.get("required_items"))
+        if items and item_mode != "required":
+            raise ValueError(
+                "При явно указанном реквизите выберите режим «Обязательно подобрать»"
+            )
         collections = parse_json_list(row.get("collections") or row.get("collection"))
         if not collections:
             collections = ["base_tasks"]

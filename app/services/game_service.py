@@ -425,11 +425,24 @@ class GameService:
             if not session:
                 raise GameError("Нет активной сессии")
             active_turn_id = session["active_turn_id"]
-            if active_turn_id:
-                conn.execute(
-                    "UPDATE turns SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (status, active_turn_id),
-                )
+            if not active_turn_id:
+                raise GameError("Активной карточки нет")
+            turn = conn.execute(
+                "SELECT player_id, status FROM turns WHERE id = ?",
+                (active_turn_id,),
+            ).fetchone()
+            if not turn or turn["status"] != "active":
+                raise GameError("Карточка уже завершена")
+            if int(turn["player_id"]) != int(user_id):
+                raise GameError("Сейчас ход другого игрока")
+            conn.execute(
+                "UPDATE turns SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (status, active_turn_id),
+            )
+            conn.execute(
+                "UPDATE timers SET status = 'cancelled' WHERE turn_id = ? AND status = 'active'",
+                (active_turn_id,),
+            )
             current_slot = session["current_player_slot"] or "player_1"
             next_slot = "player_2" if current_slot == "player_1" else "player_1"
             next_player = session["player_2_id"] if next_slot == "player_2" else session["player_1_id"]
@@ -460,8 +473,32 @@ class GameService:
 
     def reset_session(self, chat_id: int, thread_id: int | None) -> None:
         session = self.active_session(chat_id, thread_id)
-        if session:
-            self.sessions.finish_session(int(session["id"]), "reset", "manual_reset")
+        if not session:
+            return
+        with self.db.transaction() as conn:
+            conn.execute(
+                """
+                UPDATE turns
+                SET status = 'stopped', finished_at = CURRENT_TIMESTAMP
+                WHERE session_id = ? AND status IN ('selecting', 'active')
+                """,
+                (session["id"],),
+            )
+            conn.execute(
+                "UPDATE timers SET status = 'cancelled' WHERE session_id = ? AND status = 'active'",
+                (session["id"],),
+            )
+            conn.execute(
+                """
+                UPDATE sessions
+                SET status = 'reset',
+                    stop_reason = 'manual_reset',
+                    stopped_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (session["id"],),
+            )
 
     def status(self, chat_id: int, thread_id: int | None) -> dict[str, object]:
         session = self.active_session(chat_id, thread_id)
