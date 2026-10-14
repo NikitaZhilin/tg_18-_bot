@@ -150,5 +150,34 @@ fi
 
 find "$BACKUP_DIR" -type f -name 'bot-*.sqlite3' -mtime +14 -delete
 ROLLBACK_REQUIRED=0
+
+# Daily backup independent of deployments (03:30 server time, 14 days kept).
+cat >"/etc/systemd/system/$SERVICE_NAME-backup.service" <<BACKUP_SERVICE
+[Unit]
+Description=Daily SQLite backup for $SERVICE_NAME
+
+[Service]
+Type=oneshot
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/.venv/bin/python $APP_DIR/scripts/scheduled_backup.py $DATABASE_PATH $BACKUP_DIR --keep-days 14
+BACKUP_SERVICE
+
+cat >"/etc/systemd/system/$SERVICE_NAME-backup.timer" <<BACKUP_TIMER
+[Unit]
+Description=Daily SQLite backup for $SERVICE_NAME
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+BACKUP_TIMER
+
+if systemctl daemon-reload && systemctl enable --now "$SERVICE_NAME-backup.timer"; then
+  echo "Daily backup timer is active."
+else
+  echo "WARNING: could not enable the daily backup timer; the bot itself is deployed."
+fi
 echo "Deployment completed: $TARGET_COMMIT"
 systemctl status "$SERVICE_NAME" --no-pager
