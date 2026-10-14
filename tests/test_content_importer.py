@@ -24,7 +24,7 @@ def test_seed_content_counts_match_tz(tmp_path):
         ORDER BY level
         """
     )
-    assert [(row["level"], row["count"]) for row in rows] == [(1, 33), (2, 38), (3, 75), (4, 71)]
+    assert [(row["level"], row["count"]) for row in rows] == [(1, 35), (2, 41), (3, 85), (4, 78)]
     pose_count = db.fetchone("SELECT COUNT(*) AS count FROM cards WHERE category = 'pose'")["count"]
     assert pose_count == 49
     db.close()
