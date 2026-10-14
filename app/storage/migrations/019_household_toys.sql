@@ -37,3 +37,9 @@ WHERE code = 'rope';
 
 -- Vibrator over underwear is fine for «Разогрев».
 UPDATE items SET min_level = 2 WHERE code = 'vibrator' AND min_level > 2;
+
+-- Speculum for level 4; urethral play uses the existing sterile kit.
+INSERT OR IGNORE INTO items (code, name, min_level, max_level, categories, usage_text, randomizable) VALUES
+    ('speculum', 'Расширитель', 4, 4, 'task',
+     'Много лубриканта, раскрывать медленно и только по команде принимающего; при боли сразу закрыть.', 0);
+UPDATE items SET name = 'Уретральные бужи (стерильные)' WHERE code = 'sterile_urethral_kit';

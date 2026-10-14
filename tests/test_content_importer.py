@@ -24,7 +24,7 @@ def test_seed_content_counts_match_tz(tmp_path):
         ORDER BY level
         """
     )
-    assert [(row["level"], row["count"]) for row in rows] == [(1, 35), (2, 41), (3, 85), (4, 78)]
+    assert [(row["level"], row["count"]) for row in rows] == [(1, 35), (2, 41), (3, 85), (4, 82)]
     pose_count = db.fetchone("SELECT COUNT(*) AS count FROM cards WHERE category = 'pose'")["count"]
     assert pose_count == 49
     db.close()
@@ -42,7 +42,7 @@ def test_hard_and_level4_built_in_seed_cards_are_reviewed(tmp_path):
           AND is_enabled = 1
         """
     )
-    assert row["count"] == 111
+    assert row["count"] == 115
     db.close()
 
 
@@ -104,7 +104,7 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
 
     card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
     assert card["text"] == "Текст, измененный администратором"
-    assert report.added_or_updated == 343
+    assert report.added_or_updated == 347
     assert report.conflicts == 2
     conflict = db.fetchone(
         "SELECT id, status FROM seed_conflicts WHERE external_id = 'task_l1_001'"
@@ -179,7 +179,7 @@ def test_startup_seed_version_is_applied_only_once(tmp_path):
         skip_imported_version=True,
     )
 
-    assert first.added_or_updated == 345
+    assert first.added_or_updated == 349
     assert second.added_or_updated == 0
     db.close()
 
