@@ -204,6 +204,11 @@ if systemctl daemon-reload \
   && systemctl enable --now "$SERVICE_NAME-backup.timer" \
   && systemctl enable --now "$SERVICE_NAME-offsite.timer"; then
   echo "Backup timers are active."
+  # First install: send one copy right away so the owners can check it arrives.
+  if [ -z "$(systemctl show "$SERVICE_NAME-offsite.service" -p ExecMainExitTimestamp --value)" ]; then
+    systemctl start --no-block "$SERVICE_NAME-offsite.service" \
+      && echo "First Telegram backup copy is being sent."
+  fi
 else
   echo "WARNING: could not enable the backup timers; the bot itself is deployed."
 fi
