@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from app.services.card_picker import NoCardsAvailable
@@ -35,10 +37,10 @@ def test_hard_cards_are_available_without_duplicate_mode_toggle(tmp_path):
     db.close()
 
 
-def test_base_consent_required_before_draw(tmp_path):
+def test_base_consent_required_before_draw_when_enabled(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
-    service = GameService(db, make_config(tmp_path))
+    service = GameService(db, replace(make_config(tmp_path), require_daily_consent=True))
     service.ensure_session(10, None)
     with pytest.raises(GameError):
         service.draw_card(10, None, 111, level=1, category="task", intensity="light")
@@ -195,7 +197,7 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     assert result.card.external_id.startswith("restricted_")
     assert result.card.level == 4
     assert result.card.intensity == "hard"
-    assert format_card(result.card).startswith("Экстрим ·")
+    assert format_card(result.card).startswith("🔞 Экстрим ·")
     db.close()
 
 
@@ -212,10 +214,10 @@ def test_card_header_uses_level_category_and_section_number(tmp_path):
     result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
     text = format_card(result.card)
 
-    assert text.startswith("Разогрев · Задание №20")
-    assert "Что нужно сделать:" in text
+    assert text.startswith("🔥 Разогрев · Задание №20")
+    assert "Порядок:" in text
     assert "Уровень 2 - 21" not in text
-    assert "дышит в собственном обычном ритме" in text
+    assert "дышит в своём обычном ритме" in text
     db.close()
 
 
@@ -270,7 +272,7 @@ def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
     assert turn["selected_item_code"] is None
     assert resumed is not None
     assert resumed.card.selected_item_code == result.card.selected_item_code
-    assert "Обязательный реквизит:" in format_card(result.card)
+    assert "🧸 Понадобится:" in format_card(result.card)
     db.close()
 
 
@@ -398,4 +400,30 @@ def test_roulette_uses_session_default_levels(tmp_path):
 
     assert service.enabled_levels(10, None) == (3, 4)
     assert result.card.level in {3, 4}
+    db.close()
+
+
+def test_game_starts_without_consent_screen_by_default(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    assert service.has_base_consent(10, None) is True
+    result = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    assert result.card.level == 1
+    db.close()
+
+
+def test_new_game_starts_with_the_couples_toys(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    session = service.ensure_session(10, None)
+    owned = {
+        row["item_code"]
+        for row in db.fetchall("SELECT item_code FROM session_items WHERE session_id = ?", (session["id"],))
+    }
+    assert {"rope", "strapon", "dildo_mini", "anal_plug_s", "anal_plug_m", "anal_plug_l", "estim"} <= owned
+    assert "blindfold" in owned
+    assert "soft_cuffs" not in owned  # not in the couple's list
     db.close()

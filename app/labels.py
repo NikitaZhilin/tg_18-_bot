@@ -7,7 +7,7 @@ LEVEL_NAMES = {
     1: "Флирт",
     2: "Разогрев",
     3: "Секс",
-    4: "BDSM",
+    4: "БДСМ",
 }
 
 CATEGORY_NAMES = {
@@ -106,6 +106,11 @@ RISK_TAG_NAMES = {
     "no_quick_release_restraint": "Фиксация",
     "unbounded_humiliation": "Унижение",
     "unsafe_wax": "Горячий воск",
+    "neck_play": "Рука на шее",
+    "restraint": "Связывание",
+    "impact": "Шлепки и порка",
+    "wax": "Воск массажной свечи",
+    "estim": "Электростимуляция",
 }
 
 COLLECTION_NAMES = {

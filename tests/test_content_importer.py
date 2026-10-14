@@ -24,9 +24,9 @@ def test_seed_content_counts_match_tz(tmp_path):
         ORDER BY level
         """
     )
-    assert [(row["level"], row["count"]) for row in rows] == [(1, 18), (2, 23), (3, 48), (4, 44)]
+    assert [(row["level"], row["count"]) for row in rows] == [(1, 47), (2, 58), (3, 102), (4, 116)]
     pose_count = db.fetchone("SELECT COUNT(*) AS count FROM cards WHERE category = 'pose'")["count"]
-    assert pose_count == 34
+    assert pose_count == 49
     db.close()
 
 
@@ -42,7 +42,7 @@ def test_hard_and_level4_built_in_seed_cards_are_reviewed(tmp_path):
           AND is_enabled = 1
         """
     )
-    assert row["count"] == 74
+    assert row["count"] == 180
     db.close()
 
 
@@ -104,7 +104,7 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
 
     card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
     assert card["text"] == "Текст, измененный администратором"
-    assert report.added_or_updated == 180
+    assert report.added_or_updated == 468
     assert report.conflicts == 2
     conflict = db.fetchone(
         "SELECT id, status FROM seed_conflicts WHERE external_id = 'task_l1_001'"
@@ -179,7 +179,7 @@ def test_startup_seed_version_is_applied_only_once(tmp_path):
         skip_imported_version=True,
     )
 
-    assert first.added_or_updated == 182
+    assert first.added_or_updated == 470
     assert second.added_or_updated == 0
     db.close()
 
@@ -266,4 +266,44 @@ def test_startup_content_import_fails_fast_on_invalid_seed(tmp_path):
     with pytest.raises(ValueError, match="missing required columns"):
         import_startup_content(db, content_dir)
 
+    db.close()
+
+
+def test_enabled_seed_cards_stay_enabled_after_import(tmp_path):
+    """A card the content file enables must not be switched off silently by a risk tag."""
+    import csv
+
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    imported = {
+        row["external_id"]: row
+        for row in db.fetchall("SELECT external_id, review_status, is_enabled FROM cards")
+    }
+    with Path("content/cards.csv").open(encoding="utf-8-sig", newline="") as source:
+        expected_enabled = [
+            row["external_id"]
+            for row in csv.DictReader(source)
+            if row["review_status"] == "approved" and row["is_enabled"] == "1"
+        ]
+    switched_off = [
+        external_id
+        for external_id in expected_enabled
+        if imported[external_id]["is_enabled"] != 1
+    ]
+    assert switched_off == []
+    db.close()
+
+
+def test_level_concept_has_at_least_15_active_tasks_per_level(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    rows = db.fetchall(
+        """
+        SELECT level, COUNT(*) AS count
+        FROM cards
+        WHERE category = 'task' AND is_enabled = 1 AND review_status = 'approved'
+        GROUP BY level
+        """
+    )
+    assert {row["level"]: row["count"] >= 15 for row in rows} == {1: True, 2: True, 3: True, 4: True}
     db.close()

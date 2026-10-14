@@ -19,6 +19,7 @@ FORBIDDEN_RISK_TAGS = {
     "suffocation",
     "injury",
     "blood",
+    "scat",
     "cutting",
     "needles",
     "weapon",

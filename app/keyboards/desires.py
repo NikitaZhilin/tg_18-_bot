@@ -20,17 +20,15 @@ def desire_list(rows, *, page: int, total: int, player_label) -> InlineKeyboardM
         navigation.append(InlineKeyboardButton(text="→", callback_data=f"game:desires:{page + 1}"))
     if navigation:
         buttons.append(navigation)
-    buttons.append([InlineKeyboardButton(text="В меню", callback_data="game:home")])
-    buttons.append([InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")])
+    buttons.append([InlineKeyboardButton(text="🏠 Меню", callback_data="game:home")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def desire_actions(desire_id: int, page: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Использовать желание", callback_data=f"game:desire_use:{desire_id}")],
-            [InlineKeyboardButton(text="Назад к желаниям", callback_data=f"game:desires:{page}")],
-            [InlineKeyboardButton(text="В меню", callback_data="game:home")],
-            [InlineKeyboardButton(text="Завершить игру", callback_data="safe:end_game")],
+            [InlineKeyboardButton(text="✅ Использовать", callback_data=f"game:desire_use:{desire_id}")],
+            [InlineKeyboardButton(text="⬅️ К желаниям", callback_data=f"game:desires:{page}")],
+            [InlineKeyboardButton(text="🏠 Меню", callback_data="game:home")],
         ]
     )

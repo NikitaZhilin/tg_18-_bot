@@ -53,6 +53,7 @@ class Config:
     single_account_two_players: bool
     admin_content_password_sha256: str | None
     telegram_proxy_url: str | None
+    require_daily_consent: bool = False
 
     @classmethod
     def from_env(cls, env_file: str | Path = ".env") -> "Config":
@@ -78,6 +79,7 @@ class Config:
             single_account_two_players=_parse_bool(os.getenv("SINGLE_ACCOUNT_TWO_PLAYERS"), False),
             admin_content_password_sha256=(os.getenv("ADMIN_CONTENT_PASSWORD_SHA256") or "").strip() or None,
             telegram_proxy_url=os.getenv("TELEGRAM_PROXY_URL") or None,
+            require_daily_consent=_parse_bool(os.getenv("REQUIRE_DAILY_CONSENT"), False),
         )
 
     def is_allowed(self, user_id: int) -> bool:
