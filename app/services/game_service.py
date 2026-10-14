@@ -160,6 +160,7 @@ class GameService(SessionSettingsMixin):
         intensity: str | None = None,
         source: str = "manual",
         collection_code: str | None = None,
+        play_mode: str | None = None,
     ) -> DrawResult:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         with self.db.transaction() as conn:
@@ -216,9 +217,9 @@ class GameService(SessionSettingsMixin):
                 INSERT INTO turns (
                     session_id, turn_number, player_id, card_id, source, status,
                     selected_level, selected_category, selected_intensity, player_slot,
-                    selected_item_code, selected_collection_code
+                    selected_item_code, selected_collection_code, play_mode
                 )
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session["id"],
@@ -232,6 +233,7 @@ class GameService(SessionSettingsMixin):
                     current_slot,
                     card.selected_item_code,
                     collection_code,
+                    play_mode,
                 ),
             )
             turn_id = int(cur.lastrowid)
@@ -416,9 +418,9 @@ class GameService(SessionSettingsMixin):
                 INSERT INTO turns (
                     session_id, turn_number, player_id, card_id, source, status,
                     selected_level, selected_category, selected_intensity, player_slot,
-                    selected_item_code, selected_collection_code
+                    selected_item_code, selected_collection_code, play_mode
                 )
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session["id"],
@@ -432,6 +434,7 @@ class GameService(SessionSettingsMixin):
                     turn["player_slot"],
                     replacement.selected_item_code,
                     collection_code,
+                    turn["play_mode"],
                 ),
             )
             new_turn_id = int(conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"])
@@ -462,6 +465,35 @@ class GameService(SessionSettingsMixin):
         if replacement is None or new_turn_id is None:  # pragma: no cover - guarded above
             return None
         return DrawResult(new_turn_id, replacement)
+
+    def draw_truth_or_dare(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        user_id: int,
+        *,
+        level: int,
+        intensity: str,
+        category: str,
+    ) -> DrawResult:
+        """«Правда» = question, «Действие» = task of the chosen level.
+
+        Questions are few, so when they run out at this intensity the bot takes
+        one from another intensity of the same level.
+        """
+        if category not in ("question", "task"):
+            raise GameError("Неизвестный выбор")
+        kwargs = dict(level=level, category=category, play_mode=f"tod:{level}:{intensity}")
+        try:
+            return self.draw_card(chat_id, thread_id, user_id, intensity=intensity, **kwargs)
+        except NoCardsAvailable:
+            if category != "question":
+                raise
+            return self.draw_card(chat_id, thread_id, user_id, intensity=None, **kwargs)
+
+    def turn_play_mode(self, turn_id: int) -> str | None:
+        row = self.db.fetchone("SELECT play_mode FROM turns WHERE id = ?", (turn_id,))
+        return str(row["play_mode"]) if row and row["play_mode"] else None
 
     def current_card(self, chat_id: int, thread_id: int | None) -> DrawResult | None:
         session = self.active_session(chat_id, thread_id)

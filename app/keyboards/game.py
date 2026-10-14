@@ -58,6 +58,7 @@ def main_menu(
         rows.append([_button("▶️ Вернуться к карточке", "game:current")])
     rows.append([_button("🎲 Случайная карточка", "game:roulette")])
     rows.append([_button("🃏 Выбрать уровень", "game:menu")])
+    rows.append([_button("🎭 Правда или действие", "tod:menu")])
     if restricted_enabled:
         rows.append([_button("🔞 Экстрим", "game:extreme")])
     desires_text = f"🎁 Желания ({saved_desires})" if saved_desires else "🎁 Желания"
@@ -92,6 +93,7 @@ def main_menu_text(status: Mapping[str, object]) -> str:
     lines.append("")
     lines.append("🎲 Случайная — бот сам выберет карточку из уровней в настройках.")
     lines.append("🃏 Выбрать уровень — уровень, интенсивность и тип выбираете вы.")
+    lines.append("🎭 Правда или действие — по очереди: вопрос или задание на выбранном уровне.")
     return "\n".join(lines)
 
 
@@ -249,3 +251,56 @@ def boundary_menu(selected: set[str] | None = None) -> InlineKeyboardMarkup:
     rows.append([_button("💾 Сохранить", "boundaries:save")])
     rows.append([_button(BACK, "game:settings")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# «Правда или действие»: level → intensity (for 3–4) → truth or dare each turn.
+TOD_TRUTH = "💬 Правда"
+TOD_DARE = "🎯 Действие"
+
+
+def tod_level_text() -> str:
+    lines = [
+        "🎭 Правда или действие",
+        "",
+        "Каждый ход игрок выбирает: «Правда» — честно ответить на вопрос, "
+        "«Действие» — выполнить задание. Потом ход переходит ко второму.",
+        "",
+        "Выберите уровень:",
+    ]
+    for level in LEVEL_TITLES:
+        lines.append(f"{LEVEL_ICONS[level]} {LEVEL_TITLES[level]} — {LEVEL_HINTS[level]}")
+    return "\n".join(lines)
+
+
+def tod_level_menu() -> InlineKeyboardMarkup:
+    buttons = [_button(LEVEL_LABELS[level], f"tod:level:{level}") for level in LEVEL_TITLES]
+    return InlineKeyboardMarkup(inline_keyboard=[buttons[0:2], buttons[2:4], [_button(HOME, "game:home")]])
+
+
+def tod_intensity_menu(level: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_button(label, f"tod:pick:{level}:{code}") for code, label in INTENSITY_BUTTONS.items()],
+            [_button("⬅️ К уровням", "tod:menu"), _button(HOME, "game:home")],
+        ]
+    )
+
+
+def tod_choice_text(level: int, intensity: str, player_label: str | None = None) -> str:
+    title = LEVEL_LABELS[level]
+    if level >= 3:
+        title += f" · {INTENSITY_BUTTONS[intensity].split(' ', 1)[1].lower()}"
+    who = f"Ходит: {player_label}\n\n" if player_label else ""
+    return f"🎭 Правда или действие · {title}\n\n{who}Что выбираешь?"
+
+
+def tod_choice_menu(level: int, intensity: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _button(TOD_TRUTH, f"tod:draw:{level}:{intensity}:question"),
+                _button(TOD_DARE, f"tod:draw:{level}:{intensity}:task"),
+            ],
+            [_button("🔁 Сменить уровень", "tod:menu"), _button(HOME, "game:home")],
+        ]
+    )

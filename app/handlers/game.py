@@ -19,6 +19,11 @@ from app.keyboards.game import (
     level_menu_text,
     settings_menu,
     settings_menu_text,
+    tod_choice_menu,
+    tod_choice_text,
+    tod_intensity_menu,
+    tod_level_menu,
+    tod_level_text,
 )
 from app.services.card_picker import NoCardsAvailable
 from app.services.game_service import BASE_CONSENT_REQUIRED, DrawResult, GameError, GameService, format_card
@@ -235,11 +240,29 @@ async def cb_intensity(callback: CallbackQuery, config: Config, game_service: Ga
     await answer_callback(callback)
 
 
+def _ensure_game(callback: CallbackQuery, game_service: GameService) -> None:
+    chat_id, thread_id = _where(callback)
+    game_service.ensure_session(chat_id, thread_id, callback.message.chat.title if callback.message else None)
+
+
 async def _draw(callback: CallbackQuery, game_service: GameService, **kwargs) -> None:
     chat_id, thread_id = _where(callback)
+    tod = kwargs.pop("truth_or_dare", None)
     try:
-        result = game_service.draw_card(chat_id, thread_id, callback.from_user.id, **kwargs)
+        _ensure_game(callback, game_service)
+        if tod:
+            result = game_service.draw_truth_or_dare(chat_id, thread_id, callback.from_user.id, **tod)
+        else:
+            result = game_service.draw_card(chat_id, thread_id, callback.from_user.id, **kwargs)
     except NoCardsAvailable:
+        if tod:
+            what = "вопросы" if tod["category"] == "question" else "задания"
+            await answer_callback(
+                callback,
+                f"На этом уровне {what} в этой игре закончились. Выберите другое или смените уровень.",
+                show_alert=True,
+            )
+            return
         if kwargs.get("collection_code") == "restricted_content":
             await answer_callback(callback, "В разделе «Экстрим» не осталось подходящих карточек.", show_alert=True)
             return
@@ -303,14 +326,36 @@ async def cb_done(callback: CallbackQuery, config: Config, game_service: GameSer
         return
     if await _card_is_stale(callback, game_service):
         return
+    chat_id, thread_id = _where(callback)
+    status = game_service.status(chat_id, thread_id)
+    turn_id = status.get("active_turn_id")
+    play_mode = game_service.turn_play_mode(int(turn_id)) if turn_id else None
     try:
-        next_player = game_service.finish_turn(*_where(callback), callback.from_user.id, "completed")
+        next_player = game_service.finish_turn(chat_id, thread_id, callback.from_user.id, "completed")
     except GameError as exc:
         await _show_game_error(callback, exc)
         return
     await close_card(callback, "✅ Сделано")
-    await _send_home(callback, config, game_service, f"✅ Готово! Теперь очередь: {next_player}.")
+    tod = _parse_tod_mode(play_mode)
+    if tod:
+        level, intensity = tod
+        await callback.bot.send_message(
+            chat_id,
+            tod_choice_text(level, intensity, next_player),
+            reply_markup=tod_choice_menu(level, intensity),
+            message_thread_id=thread_id,
+        )
+    else:
+        await _send_home(callback, config, game_service, f"✅ Готово! Теперь очередь: {next_player}.")
     await answer_callback(callback)
+
+
+def _parse_tod_mode(play_mode: str | None) -> tuple[int, str] | None:
+    """'tod:3:medium' -> (3, 'medium')."""
+    parts = (play_mode or "").split(":")
+    if len(parts) == 3 and parts[0] == "tod" and parts[1].isdigit():
+        return int(parts[1]), parts[2]
+    return None
 
 
 @router.callback_query(F.data.startswith("game:replace"))
@@ -453,3 +498,55 @@ async def cb_reset_no(callback: CallbackQuery, config: Config, game_service: Gam
         return
     await _show_home(callback, config, game_service)
     await answer_callback(callback)
+
+
+# ---- «Правда или действие» ----
+
+@router.callback_query(F.data == "tod:menu")
+async def cb_tod_menu(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    await show_screen(callback, tod_level_text(), tod_level_menu())
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("tod:level:"))
+async def cb_tod_level(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    level = int(callback.data.split(":")[-1])
+    if level >= 3:
+        await show_screen(callback, intensity_menu_text(level), tod_intensity_menu(level))
+    else:
+        await _show_tod_choice(callback, game_service, level, "light")
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("tod:pick:"))
+async def cb_tod_pick(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    _, _, level, intensity = callback.data.split(":")
+    await _show_tod_choice(callback, game_service, int(level), intensity)
+    await answer_callback(callback)
+
+
+async def _show_tod_choice(callback: CallbackQuery, game_service: GameService, level: int, intensity: str) -> None:
+    status = game_service.status(*_where(callback))
+    await show_screen(
+        callback,
+        tod_choice_text(level, intensity, status.get("current_player_label") if status.get("active") else None),
+        tod_choice_menu(level, intensity),
+    )
+
+
+@router.callback_query(F.data.startswith("tod:draw:"))
+async def cb_tod_draw(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    _, _, level, intensity, category = callback.data.split(":")
+    await _draw(
+        callback,
+        game_service,
+        truth_or_dare=dict(level=int(level), intensity=intensity, category=category),
+    )

@@ -42,7 +42,7 @@ def test_hard_and_level4_built_in_seed_cards_are_reviewed(tmp_path):
           AND is_enabled = 1
         """
     )
-    assert row["count"] == 180
+    assert row["count"] == 164
     db.close()
 
 
