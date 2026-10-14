@@ -106,6 +106,7 @@ RISK_TAG_NAMES = {
     "no_quick_release_restraint": "Фиксация",
     "unbounded_humiliation": "Унижение",
     "unsafe_wax": "Горячий воск",
+    "neck_play": "Рука на шее",
 }
 
 COLLECTION_NAMES = {
