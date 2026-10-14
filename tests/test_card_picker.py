@@ -197,7 +197,7 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     assert result.card.external_id.startswith("restricted_")
     assert result.card.level == 4
     assert result.card.intensity == "hard"
-    assert format_card(result.card).startswith("Экстрим ·")
+    assert format_card(result.card).startswith("🔞 Экстрим ·")
     db.close()
 
 
