@@ -107,6 +107,9 @@ RISK_TAG_NAMES = {
     "unbounded_humiliation": "Унижение",
     "unsafe_wax": "Горячий воск",
     "neck_play": "Рука на шее",
+    "restraint": "Связывание",
+    "impact": "Шлепки и порка",
+    "wax": "Воск низкотемпературной свечи",
 }
 
 COLLECTION_NAMES = {

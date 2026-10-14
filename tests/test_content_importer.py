@@ -267,3 +267,43 @@ def test_startup_content_import_fails_fast_on_invalid_seed(tmp_path):
         import_startup_content(db, content_dir)
 
     db.close()
+
+
+def test_enabled_seed_cards_stay_enabled_after_import(tmp_path):
+    """A card the content file enables must not be switched off silently by a risk tag."""
+    import csv
+
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    imported = {
+        row["external_id"]: row
+        for row in db.fetchall("SELECT external_id, review_status, is_enabled FROM cards")
+    }
+    with Path("content/cards.csv").open(encoding="utf-8-sig", newline="") as source:
+        expected_enabled = [
+            row["external_id"]
+            for row in csv.DictReader(source)
+            if row["review_status"] == "approved" and row["is_enabled"] == "1"
+        ]
+    switched_off = [
+        external_id
+        for external_id in expected_enabled
+        if imported[external_id]["is_enabled"] != 1
+    ]
+    assert switched_off == []
+    db.close()
+
+
+def test_level_concept_has_at_least_15_active_tasks_per_level(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    rows = db.fetchall(
+        """
+        SELECT level, COUNT(*) AS count
+        FROM cards
+        WHERE category = 'task' AND is_enabled = 1 AND review_status = 'approved'
+        GROUP BY level
+        """
+    )
+    assert {row["level"]: row["count"] >= 15 for row in rows} == {1: True, 2: True, 3: True, 4: True}
+    db.close()

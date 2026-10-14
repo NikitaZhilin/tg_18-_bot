@@ -184,10 +184,10 @@ def reset_confirm() -> InlineKeyboardMarkup:
 
 
 BOUNDARY_OPTIONS = [
-    ("no_quick_release_restraint", "Без фиксации"),
+    ("restraint", "Без связывания"),
     ("unbounded_humiliation", "Без унижения"),
-    ("injury", "Без боли/травм"),
-    ("unsafe_wax", "Без воска"),
+    ("impact", "Без шлепков и порки"),
+    ("wax", "Без воска"),
     ("sensory_deprivation", "Без сенсорных ограничений"),
     ("food", "Без еды/напитков"),
     ("toys", "Без игрушек"),
