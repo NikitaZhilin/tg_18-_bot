@@ -1,0 +1,32 @@
+name: Server health (read-only)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 5 * * *"  # 08:15 Moscow
+  push:
+    branches: ["ops/health"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-health
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install SSH client helper
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Run read-only server check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: bash scripts/ci_server_health.sh

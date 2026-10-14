@@ -44,6 +44,7 @@ jobs:
           python -B -m pytest -q -rfE --tb=line 2>&1 | tee pytest.log
           status=${PIPESTATUS[0]}
           grep -E "^(FAILED|ERROR) " pytest.log | head -30 | while IFS= read -r l; do echo "::error::$l"; done
+          tail -n 1 pytest.log | sed 's/^/::notice title=Tests::/'
           exit $status
 
   deploy:
@@ -81,3 +82,11 @@ jobs:
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "bash -s -- '$GITHUB_SHA'" < scripts/deploy_server.sh
+      - name: Read-only server check after deploy
+        if: always()
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: bash scripts/ci_server_health.sh
