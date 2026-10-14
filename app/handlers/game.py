@@ -12,9 +12,13 @@ from app.keyboards.game import (
     consent_menu,
     default_levels_menu,
     end_game_confirm,
+    category_menu_text,
     intensity_menu,
+    intensity_menu_text,
     level_menu,
+    level_menu_text,
     settings_menu,
+    settings_menu_text,
 )
 from app.services.card_picker import NoCardsAvailable
 from app.services.game_service import BASE_CONSENT_REQUIRED, DrawResult, GameError, GameService, format_card
@@ -23,7 +27,10 @@ from app.services.timer_service import TimerService
 
 router = Router(name="game")
 
-NO_CARDS_TEXT = "Подходящих карточек не осталось или они не подходят под выбранный реквизит."
+NO_CARDS_TEXT = (
+    "Здесь карточек больше нет. Либо все уже сыграны в этой игре, "
+    "либо для оставшихся нужен реквизит, который не отмечен в «⚙️ Настройки → 🧸 Игрушки и реквизит»."
+)
 CARD_CLOSED_TEXT = "Эта карточка уже закрыта."
 
 
@@ -107,7 +114,7 @@ async def cb_game_home(callback: CallbackQuery, config: Config, game_service: Ga
     message = callback.message
     if message is not None and getattr(message, "reply_markup", None) and _is_card_message(message):
         # «В меню» from a card keeps the card on screen and opens the menu below it.
-        await _send_home(callback, config, game_service, "Карточка остаётся открытой.")
+        await _send_home(callback, config, game_service, "▶️ Карточка остаётся открытой — вернуться к ней можно из меню.")
     else:
         await _show_home(callback, config, game_service)
     await answer_callback(callback)
@@ -132,7 +139,7 @@ async def cb_settings(callback: CallbackQuery, config: Config, game_service: Gam
     status = game_service.status(chat_id, thread_id)
     await show_screen(
         callback,
-        "Настройки этой игры.\nУровни рулетки — откуда берёт карточки «Русская рулетка».",
+        settings_menu_text(),
         settings_menu(tuple(status.get("enabled_levels") or (1, 2, 3, 4))),
     )
     await answer_callback(callback)
@@ -169,7 +176,7 @@ async def cb_game_menu(callback: CallbackQuery, config: Config, game_service: Ga
         )
         await answer_callback(callback)
         return
-    await show_screen(callback, "Выберите уровень:", _level_menu(game_service, chat_id, thread_id))
+    await show_screen(callback, level_menu_text(), _level_menu(game_service, chat_id, thread_id))
     await answer_callback(callback)
 
 
@@ -203,12 +210,13 @@ async def cb_level(callback: CallbackQuery, config: Config, game_service: GameSe
         return
     level = int(callback.data.split(":")[-1])
     if level >= 3:
-        await show_screen(callback, "Выберите интенсивность:", intensity_menu(level))
+        await show_screen(callback, intensity_menu_text(level), intensity_menu(level))
     else:
+        categories = game_service.categories_with_cards(level, "light")
         await show_screen(
             callback,
-            "Выберите категорию:",
-            category_menu(level, "light", game_service.categories_with_cards(level, "light")),
+            category_menu_text(level, "light", categories),
+            category_menu(level, "light", categories),
         )
     await answer_callback(callback)
 
@@ -218,10 +226,11 @@ async def cb_intensity(callback: CallbackQuery, config: Config, game_service: Ga
     if await reject_callback_if_not_allowed(callback, config):
         return
     _, _, level, intensity = callback.data.split(":")
+    categories = game_service.categories_with_cards(int(level), intensity)
     await show_screen(
         callback,
-        "Выберите категорию:",
-        category_menu(int(level), intensity, game_service.categories_with_cards(int(level), intensity)),
+        category_menu_text(int(level), intensity, categories),
+        category_menu(int(level), intensity, categories),
     )
     await answer_callback(callback)
 
@@ -299,8 +308,8 @@ async def cb_done(callback: CallbackQuery, config: Config, game_service: GameSer
     except GameError as exc:
         await _show_game_error(callback, exc)
         return
-    await close_card(callback, "✓ Выполнено")
-    await _send_home(callback, config, game_service, f"Ход завершён. Следующий: {next_player}.")
+    await close_card(callback, "✅ Сделано")
+    await _send_home(callback, config, game_service, f"✅ Готово! Теперь очередь: {next_player}.")
     await answer_callback(callback)
 
 
@@ -334,7 +343,7 @@ async def cb_replace_card(
         return
     if session_id:
         safety_service.safe_skip(session_id, turn_id, callback.from_user.id)
-    await _show_card(callback, result, "Новая карточка:\n\n")
+    await _show_card(callback, result, "🔄 Другая карточка:\n\n")
     await answer_callback(callback)
 
 
@@ -364,13 +373,13 @@ async def cb_request_card_revision(
         text, markup = home(game_service, config, chat_id, thread_id, callback.from_user.id)
         await show_screen(
             callback,
-            "Карточка отправлена на доработку и больше не будет выпадать. "
-            f"Другой карточки с теми же условиями сейчас нет.\n\n{text}",
+            "🚫 Карточка убрана из игры и отправлена в админку на доработку. "
+            f"Другой с теми же условиями сейчас нет.\n\n{text}",
             markup,
         )
         await answer_callback(callback)
         return
-    await _show_card(callback, replacement, "Карточка отправлена на доработку.\n\nНовая карточка:\n\n")
+    await _show_card(callback, replacement, "🚫 Прошлая карточка убрана. Вот другая:\n\n")
     await answer_callback(callback)
 
 
@@ -381,7 +390,7 @@ async def cb_default_levels(callback: CallbackQuery, config: Config, game_servic
     status = game_service.status(*_where(callback))
     await show_screen(
         callback,
-        "Выберите уровни, из которых рулетка будет брать карточки по умолчанию:",
+        "🎲 Из каких уровней брать случайную карточку? Нажмите, чтобы включить или выключить.",
         default_levels_menu(tuple(status.get("enabled_levels") or (1, 2, 3, 4))),
     )
     await answer_callback(callback)
@@ -418,7 +427,7 @@ async def cb_timer(callback: CallbackQuery, config: Config, timer_service: Timer
         await callback.message.edit_reply_markup(reply_markup=card_actions(turn_id, False))
     except Exception:
         pass
-    await answer_callback(callback, "Таймер запущен. Бот напишет, когда время выйдет.")
+    await answer_callback(callback, "⏱ Таймер пошёл. Бот напишет, когда время выйдет.")
 
 
 @router.callback_query(F.data == "game:reset:yes")

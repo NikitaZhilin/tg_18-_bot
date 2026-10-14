@@ -40,8 +40,8 @@ def test_main_menu_is_compact_and_admin_only_for_owners():
 
 def test_category_menu_shows_only_categories_with_cards():
     texts = _texts(category_menu(3, "hard", ["pose", "task"]))
-    assert "Поза" in texts and "Задание" in texts
-    assert "Вопрос" not in texts and "Желание" not in texts
+    assert "🛏 Поза" in texts and "🎯 Задание" in texts
+    assert "💬 Вопрос" not in texts and "🎁 Желание" not in texts
 
 
 def test_card_buttons_are_bound_to_the_card():
@@ -136,8 +136,8 @@ def test_done_closes_the_card_and_opens_menu_below(tmp_path):
 
     asyncio.run(game.cb_done(callback, config, service))
 
-    assert card_message.reply_markup is None and card_message.text.endswith("✓ Выполнено")
-    assert "Следующий: B" in callback.bot.sent[0][1]
+    assert card_message.reply_markup is None and card_message.text.endswith("✅ Сделано")
+    assert "очередь: B" in callback.bot.sent[0][1]
     assert service.status(CHAT, None)["has_active_turn"] is False
 
 
@@ -196,3 +196,15 @@ def test_help_hides_owner_commands_from_partner(tmp_path):
     asyncio.run(start.cmd_help(partner, config))
     assert "/admin" in owner.sent[0]
     assert "/admin" not in partner.sent[0] and "/stopword" in partner.sent[0]
+
+
+def test_menu_screens_explain_levels_intensity_and_categories():
+    from app.keyboards.game import category_menu_text, intensity_menu_text, level_menu_text
+
+    levels = level_menu_text()
+    for name in ("Флирт", "Разогрев", "Секс", "БДСМ"):
+        assert name in levels
+    assert "связывание" in levels
+    assert "🌿 Мягко" in intensity_menu_text(3) and "💥 Жёстко" in intensity_menu_text(3)
+    text = category_menu_text(4, "hard", ["task", "pose"])
+    assert "🎯 Задание" in text and "🛏 Поза" in text and "💬 Вопрос" not in text

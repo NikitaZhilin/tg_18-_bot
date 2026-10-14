@@ -214,8 +214,8 @@ def test_card_header_uses_level_category_and_section_number(tmp_path):
     result = service.draw_card(10, None, 111, level=2, category="task", intensity="light")
     text = format_card(result.card)
 
-    assert text.startswith("Разогрев · Задание №20")
-    assert "Что нужно сделать:" in text
+    assert text.startswith("🔥 Разогрев · Задание №20")
+    assert "Порядок:" in text
     assert "Уровень 2 - 21" not in text
     assert "дышит в своём обычном ритме" in text
     db.close()
@@ -272,7 +272,7 @@ def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
     assert turn["selected_item_code"] is None
     assert resumed is not None
     assert resumed.card.selected_item_code == result.card.selected_item_code
-    assert "Обязательный реквизит:" in format_card(result.card)
+    assert "🧸 Понадобится:" in format_card(result.card)
     db.close()
 
 

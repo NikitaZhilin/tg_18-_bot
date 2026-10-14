@@ -615,9 +615,15 @@ class GameService(SessionSettingsMixin):
 
 
 def format_card(card: PickedCard) -> str:
-    section = "Экстрим" if card.collection_code == "restricted_content" else LEVEL_NAMES[card.level]
-    title = f"{section} · {CATEGORY_NAMES[card.category]} №{card.display_number}"
-    intensity = f"\nИнтенсивность: {INTENSITY_NAMES[card.intensity]}" if card.level >= 3 else ""
+    from app.keyboards.game import LEVEL_ICONS
+
+    if card.collection_code == "restricted_content":
+        section = "🔞 Экстрим"
+    else:
+        section = f"{LEVEL_ICONS.get(card.level, '')} {LEVEL_NAMES[card.level]}".strip()
+    intensity = f" · {INTENSITY_NAMES[card.intensity]}" if card.level >= 3 else ""
+    title = f"{section}{intensity} · {CATEGORY_NAMES[card.category]} №{card.display_number}"
+    heading = f"\n«{card.title}»" if getattr(card, "title", "") else ""
     item = ""
     if card.required_items:
         item_lines = []
@@ -625,16 +631,20 @@ def format_card(card: PickedCard) -> str:
             item_lines.append(f"• {name}")
             if usage:
                 item_lines.append(f"  {usage}")
-        item = "\n\nОбязательный реквизит:\n" + "\n".join(item_lines)
+        item = "\n\n🧸 Понадобится:\n" + "\n".join(item_lines)
     if card.selected_item_name:
-        item = f"\n\nРеквизит для этой карточки: {card.selected_item_name}."
+        item = f"\n\n🧸 Бонус к карточке: {card.selected_item_name}."
         if card.selected_item_usage:
             item += f"\n{card.selected_item_usage}"
-    timer = f"\n\nТаймер: {card.timer_seconds} сек." if card.timer_seconds else ""
+    minutes, seconds = divmod(card.timer_seconds or 0, 60)
+    if card.timer_seconds:
+        duration = f"{minutes} мин" + (f" {seconds} сек" if seconds else "") if minutes else f"{seconds} сек"
+        timer = f"\n\n⏱ {duration} — нажмите «Запустить таймер», бот напомнит."
+    else:
+        timer = ""
     aftercare = (
-        "\n\nПосле задания: полностью остановитесь, устройтесь удобно и по очереди скажите, "
-        "что было комфортно, что стоит изменить и что не нужно повторять."
+        "\n\n💛 После: обнимитесь, дайте друг другу воды и скажите, как было."
         if card.aftercare_required
         else ""
     )
-    return f"{title}{intensity}\n\nЧто нужно сделать:\n{card.text}{item}{timer}{aftercare}"
+    return f"{title}{heading}\n\n{card.text}{item}{timer}{aftercare}"

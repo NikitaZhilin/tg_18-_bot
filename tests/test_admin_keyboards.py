@@ -65,10 +65,10 @@ def test_game_keyboards_have_main_menu_and_dynamic_modes():
     ]
     assert not any(text.startswith("Уровень 4:") for text in texts)
     assert not any(text.startswith("Жесткий режим:") for text in texts)
-    assert "Экстрим" in texts
+    assert "🔞 Экстрим" in texts
     assert "game:settings" in _callbacks(main_menu())
     settings_texts = [button.text for row in settings_menu((3, 4)).inline_keyboard for button in row]
-    assert "Уровни рулетки: Секс, BDSM" in settings_texts
+    assert "🎲 Уровни для случайной: Секс, БДСМ" in settings_texts
     assert "game:level:4" in _callbacks(level_menu())
     assert "game:intensity:4:hard" in _callbacks(intensity_menu(4))
 
@@ -83,13 +83,13 @@ def test_status_menu_preserves_active_turn_and_restricted_access():
         }
     )
     texts = [button.text for row in markup.inline_keyboard for button in row]
-    assert "Продолжить текущую карточку" in texts
-    assert "Экстрим" in texts
-    assert "Настройки" in texts
+    assert "▶️ Вернуться к карточке" in texts
+    assert "🔞 Экстрим" in texts
+    assert "⚙️ Настройки" in texts
 
 
 def test_inventory_keyboard_displays_frequency_and_settings_return():
     markup = inventory_menu([{"code": "oil", "name": "Масло"}], {"oil": 3})
     texts = [button.text for row in markup.inline_keyboard for button in row]
-    assert "Масло: часто" in texts
+    assert "🟢 Масло — есть · часто" in texts
     assert "game:settings" in _callbacks(markup)

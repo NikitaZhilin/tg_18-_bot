@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
 from app.handlers.screens import show_screen
-from app.keyboards.game import boundary_menu, settings_menu
+from app.keyboards.game import boundary_menu, settings_menu, settings_menu_text
 from app.keyboards.inventory import inventory_menu
 from app.services.game_service import GameError, GameService
 
@@ -41,7 +41,11 @@ async def cb_inventory(callback: CallbackQuery, config: Config, game_service: Ga
     )
     await show_screen(
         callback,
-        "Настройте реквизит. Нажатие меняет частоту: выключен → редко → иногда → часто.",
+        "🧸 Игрушки и реквизит\n\n"
+        "Отметьте, что у вас есть. Нажатие переключает: нет → редко → иногда → часто — "
+        "так часто бот будет предлагать карточки с этой вещью. "
+        "Карточки, где нужна вещь с отметкой «нет», не выпадают.\n\n"
+        "Не забудьте нажать «💾 Сохранить».",
         inventory_menu(game_service.available_items(), selected),
     )
     await answer_callback(callback)
@@ -74,7 +78,7 @@ async def cb_inventory_save(callback: CallbackQuery, config: Config, game_servic
     )
     await show_screen(
         callback,
-        "Реквизит и частота выпадения сохранены для этой игры.",
+        "💾 Игрушки сохранены.\n\n" + settings_menu_text(),
         _settings(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
     await answer_callback(callback)
@@ -94,7 +98,12 @@ async def cb_boundaries(callback: CallbackQuery, config: Config, game_service: G
         callback_thread_id(callback),
         callback.from_user.id,
     )
-    await show_screen(callback, "Что сегодня точно исключаем?", boundary_menu(selected))
+    await show_screen(
+        callback,
+        "🚧 Границы на сегодня\n\nОтмеченное 🚫 не будет выпадать до конца игры. "
+        "Не забудьте нажать «💾 Сохранить».",
+        boundary_menu(selected),
+    )
     await answer_callback(callback)
 
 
@@ -127,7 +136,7 @@ async def cb_boundaries_save(callback: CallbackQuery, config: Config, game_servi
     )
     await show_screen(
         callback,
-        "Границы сохранены.",
+        "💾 Границы сохранены.\n\n" + settings_menu_text(),
         _settings(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
     await answer_callback(callback)
