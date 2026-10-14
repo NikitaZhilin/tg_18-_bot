@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from app.services.card_picker import NoCardsAvailable
@@ -35,10 +37,10 @@ def test_hard_cards_are_available_without_duplicate_mode_toggle(tmp_path):
     db.close()
 
 
-def test_base_consent_required_before_draw(tmp_path):
+def test_base_consent_required_before_draw_when_enabled(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
-    service = GameService(db, make_config(tmp_path))
+    service = GameService(db, replace(make_config(tmp_path), require_daily_consent=True))
     service.ensure_session(10, None)
     with pytest.raises(GameError):
         service.draw_card(10, None, 111, level=1, category="task", intensity="light")
@@ -398,4 +400,15 @@ def test_roulette_uses_session_default_levels(tmp_path):
 
     assert service.enabled_levels(10, None) == (3, 4)
     assert result.card.level in {3, 4}
+    db.close()
+
+
+def test_game_starts_without_consent_screen_by_default(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    service.ensure_session(10, None)
+    assert service.has_base_consent(10, None) is True
+    result = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
+    assert result.card.level == 1
     db.close()

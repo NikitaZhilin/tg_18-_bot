@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.services.game_service import GameService
 from app.services.safety_service import SafetyService
 from app.services.timer_service import TimerService
@@ -61,7 +63,7 @@ def test_manual_reset_stops_turn_and_cancels_timer(tmp_path):
 def test_single_account_consent_is_reused_for_new_session_on_same_day(tmp_path):
     db = migrated_db(tmp_path)
     import_seed(db)
-    config = make_single_account_config(tmp_path)
+    config = replace(make_single_account_config(tmp_path), require_daily_consent=True)
     game = GameService(db, config)
     game.ensure_session(10, None)
     assert game.accept_base_consent(10, None, 111) is False

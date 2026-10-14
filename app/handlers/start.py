@@ -62,6 +62,7 @@ async def cmd_start(
         "Стоп-слово доступно в любой момент: /stopword.",
         reply_markup=consent_menu(player_name),
     )
+    # Reached only when REQUIRE_DAILY_CONSENT=true.
 
 
 @router.message(Command("help"))

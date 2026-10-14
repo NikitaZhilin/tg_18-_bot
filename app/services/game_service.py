@@ -141,6 +141,8 @@ class GameService(SessionSettingsMixin):
         return self._player_label(slot) if slot else None
 
     def has_base_consent(self, chat_id: int, thread_id: int | None) -> bool:
+        if not self.config.require_daily_consent:
+            return True
         session = self.active_session(chat_id, thread_id)
         if not session:
             return False
@@ -164,7 +166,10 @@ class GameService(SessionSettingsMixin):
             session = self.sessions.get_active(chat_key, conn)
             if not session:
                 raise GameError("Нет активной сессии")
-            if len(self.sessions.accepted_consent_slots(int(session["id"]))) < 2:
+            if (
+                self.config.require_daily_consent
+                and len(self.sessions.accepted_consent_slots(int(session["id"]))) < 2
+            ):
                 raise GameError(BASE_CONSENT_REQUIRED)
             if int(session["current_player_id"]) != int(user_id):
                 raise GameError("Сейчас ход другого игрока")
