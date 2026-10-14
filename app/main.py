@@ -9,6 +9,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 
+from app.bot_commands import publish_commands
 from app.config import Config
 from app.handlers import (
     admin,
@@ -138,6 +139,7 @@ async def run_async() -> None:
         db.close()
         raise
     logger.info("connected to Telegram as @%s", me.username)
+    await publish_commands(bot, config)
     dp = build_dispatcher(services)
     timer_service = services["timer_service"]
     assert isinstance(timer_service, TimerService)

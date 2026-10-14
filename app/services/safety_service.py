@@ -12,6 +12,22 @@ class SafetyService:
         self.timers = TimerRepository(db)
 
     def stopword(self, chat_id: int, thread_id: int | None, user_id: int | None) -> bool:
+        """Immediate stop: recorded as a safety event."""
+        return self._close_session(chat_id, thread_id, user_id, status="stopped", reason="stopword")
+
+    def end_game(self, chat_id: int, thread_id: int | None, user_id: int | None) -> bool:
+        """Ordinary end of the evening: not a safety event."""
+        return self._close_session(chat_id, thread_id, user_id, status="completed", reason="end_game")
+
+    def _close_session(
+        self,
+        chat_id: int,
+        thread_id: int | None,
+        user_id: int | None,
+        *,
+        status: str,
+        reason: str,
+    ) -> bool:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         with self.db.transaction() as conn:
             session = self.sessions.get_active(chat_key, conn)
@@ -36,21 +52,22 @@ class SafetyService:
             conn.execute(
                 """
                 UPDATE sessions
-                SET status = 'stopped',
-                    stop_reason = 'stopword',
+                SET status = ?,
+                    stop_reason = ?,
                     stopped_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (session["id"],),
+                (status, reason, session["id"]),
             )
-            conn.execute(
-                """
-                INSERT INTO safety_events (session_id, turn_id, user_id, event_type)
-                VALUES (?, ?, ?, 'stopword')
-                """,
-                (session["id"], session["active_turn_id"], user_id),
-            )
+            if reason == "stopword":
+                conn.execute(
+                    """
+                    INSERT INTO safety_events (session_id, turn_id, user_id, event_type)
+                    VALUES (?, ?, ?, 'stopword')
+                    """,
+                    (session["id"], session["active_turn_id"], user_id),
+                )
             return True
 
     def safe_skip(self, session_id: int, turn_id: int | None, user_id: int) -> None:

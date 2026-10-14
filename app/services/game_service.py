@@ -577,7 +577,36 @@ class GameService(SessionSettingsMixin):
             "restricted_content": bool(session["allow_restricted_content"]),
             "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
+            "active_turn_id": session["active_turn_id"],
+            "saved_desires": int(
+                self.db.fetchone(
+                    "SELECT COUNT(*) AS count FROM saved_desires WHERE session_id = ? AND status = 'saved'",
+                    (session["id"],),
+                )["count"]
+            ),
         }
+
+    def categories_with_cards(self, level: int, intensity: str) -> list[str]:
+        """Categories that have at least one playable card, so the menu shows no dead buttons."""
+        rows = self.db.fetchall(
+            """
+            SELECT DISTINCT c.category
+            FROM cards c
+            WHERE c.is_enabled = 1
+              AND c.review_status = 'approved'
+              AND c.is_archived = 0
+              AND c.deleted_at IS NULL
+              AND c.level = ?
+              AND c.intensity = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM card_collection_items restricted
+                  WHERE restricted.card_id = c.id
+                    AND restricted.collection_code = 'restricted_content'
+              )
+            """,
+            (level, intensity),
+        )
+        return [str(row["category"]) for row in rows]
 
 
 def format_card(card: PickedCard) -> str:
