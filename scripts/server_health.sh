@@ -60,6 +60,13 @@ fi
 timer_state="$(systemctl is-active "$SERVICE_NAME-backup.timer" 2>/dev/null)"
 echo "BACKUP_TIMER: $timer_state"
 [ "$timer_state" = "active" ] || echo "WARN: daily backup timer is not active"
+offsite_state="$(systemctl is-active "$SERVICE_NAME-offsite.timer" 2>/dev/null)"
+echo "OFFSITE_TIMER: $offsite_state"
+[ "$offsite_state" = "active" ] || echo "WARN: weekly Telegram backup timer is not active"
+offsite_result="$(systemctl show "$SERVICE_NAME-offsite.service" -p Result --value 2>/dev/null)"
+offsite_last="$(systemctl show "$SERVICE_NAME-offsite.service" -p ExecMainExitTimestamp --value 2>/dev/null)"
+echo "OFFSITE_LAST_RUN: ${offsite_last:-never} (${offsite_result:-?})"
+[ -n "$offsite_last" ] && [ "$offsite_result" != "success" ] && echo "WARN: last Telegram backup failed"
 
 PY="$APP_DIR/.venv/bin/python"
 [ -x "$PY" ] || PY=python3

@@ -175,10 +175,37 @@ Persistent=true
 WantedBy=timers.target
 BACKUP_TIMER
 
-if systemctl daemon-reload && systemctl enable --now "$SERVICE_NAME-backup.timer"; then
-  echo "Daily backup timer is active."
+# Weekly off-server copy to the owners in Telegram (Sunday 12:00 Moscow time).
+cat >"/etc/systemd/system/$SERVICE_NAME-offsite.service" <<OFFSITE_SERVICE
+[Unit]
+Description=Weekly Telegram copy of the $SERVICE_NAME database
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/.venv/bin/python $APP_DIR/scripts/send_backup_telegram.py --env-file $APP_DIR/.env
+OFFSITE_SERVICE
+
+cat >"/etc/systemd/system/$SERVICE_NAME-offsite.timer" <<OFFSITE_TIMER
+[Unit]
+Description=Weekly Telegram copy of the $SERVICE_NAME database
+
+[Timer]
+OnCalendar=Sun *-*-* 12:00:00 Europe/Moscow
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+OFFSITE_TIMER
+
+if systemctl daemon-reload \
+  && systemctl enable --now "$SERVICE_NAME-backup.timer" \
+  && systemctl enable --now "$SERVICE_NAME-offsite.timer"; then
+  echo "Backup timers are active."
 else
-  echo "WARNING: could not enable the daily backup timer; the bot itself is deployed."
+  echo "WARNING: could not enable the backup timers; the bot itself is deployed."
 fi
 echo "Deployment completed: $TARGET_COMMIT"
 systemctl status "$SERVICE_NAME" --no-pager
