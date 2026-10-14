@@ -215,7 +215,7 @@ def test_card_header_uses_level_category_and_section_number(tmp_path):
     assert text.startswith("Разогрев · Задание №20")
     assert "Что нужно сделать:" in text
     assert "Уровень 2 - 21" not in text
-    assert "дышит в собственном обычном ритме" in text
+    assert "дышит в своём обычном ритме" in text
     db.close()
 
 
