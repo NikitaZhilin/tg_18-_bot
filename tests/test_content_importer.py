@@ -42,7 +42,7 @@ def test_hard_and_level4_built_in_seed_cards_are_reviewed(tmp_path):
           AND is_enabled = 1
         """
     )
-    assert row["count"] == 101
+    assert row["count"] == 111
     db.close()
 
 
@@ -104,7 +104,7 @@ def test_startup_seed_does_not_overwrite_admin_changes(tmp_path):
 
     card = db.fetchone("SELECT text FROM cards WHERE external_id = 'task_l1_001'")
     assert card["text"] == "Текст, измененный администратором"
-    assert report.added_or_updated == 321
+    assert report.added_or_updated == 343
     assert report.conflicts == 2
     conflict = db.fetchone(
         "SELECT id, status FROM seed_conflicts WHERE external_id = 'task_l1_001'"
@@ -179,7 +179,7 @@ def test_startup_seed_version_is_applied_only_once(tmp_path):
         skip_imported_version=True,
     )
 
-    assert first.added_or_updated == 323
+    assert first.added_or_updated == 345
     assert second.added_or_updated == 0
     db.close()
 
