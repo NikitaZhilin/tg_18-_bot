@@ -10,9 +10,15 @@ from aiogram.fsm.storage.base import BaseStorage, StateType, StorageKey
 from app.storage.database import Database
 
 
+# An unfinished admin dialog older than this is forgotten, so a message typed
+# days later is not taken as the next step (card title, password, ...).
+STATE_TTL_MINUTES = 120
+
+
 class SQLiteFSMStorage(BaseStorage):
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, state_ttl_minutes: int = STATE_TTL_MINUTES):
         self.db = db
+        self.state_ttl_minutes = state_ttl_minutes
 
     @staticmethod
     def _key_values(key: StorageKey) -> tuple[int, int, int, int, str, str]:
@@ -47,14 +53,20 @@ class SQLiteFSMStorage(BaseStorage):
     async def get_state(self, key: StorageKey) -> str | None:
         row = self.db.fetchone(
             """
-            SELECT state
+            SELECT state, updated_at < datetime('now', ?) AS expired
             FROM fsm_states
             WHERE bot_id = ? AND chat_id = ? AND user_id = ? AND thread_id = ?
               AND business_connection_id = ? AND destiny = ?
             """,
-            self._key_values(key),
+            (f"-{int(self.state_ttl_minutes)} minutes", *self._key_values(key)),
         )
-        return str(row["state"]) if row and row["state"] is not None else None
+        if not row or row["state"] is None:
+            return None
+        if row["expired"]:
+            await self.set_state(key, None)
+            await self.set_data(key, {})
+            return None
+        return str(row["state"])
 
     async def set_data(self, key: StorageKey, data: Mapping[str, Any]) -> None:
         serialized = json.dumps(dict(data), ensure_ascii=False, separators=(",", ":"))

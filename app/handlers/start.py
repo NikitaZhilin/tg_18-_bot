@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import Router
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.config import Config
@@ -13,9 +14,17 @@ router = Router(name="start")
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, config: Config, game_service: GameService) -> None:
+async def cmd_start(
+    message: Message,
+    config: Config,
+    game_service: GameService,
+    state: FSMContext,
+) -> None:
     if await reject_if_not_allowed(message, config):
         return
+    if await state.get_state() is not None:
+        await state.clear()
+        await message.answer("Незаконченное действие в админке отменено.")
     try:
         game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
     except GameError as exc:
@@ -48,5 +57,6 @@ async def cmd_help(message: Message, config: Config) -> None:
         "/status - статус бота и сессии\n"
         "/admin - админка контента\n"
         "/reset - завершить сессию с подтверждением\n"
-        "/stopword - мгновенно остановить игру"
+        "/stopword - мгновенно остановить игру\n\n"
+        "Если кнопка не отвечает или устарела, наберите /start."
     )
