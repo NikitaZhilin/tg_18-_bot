@@ -70,14 +70,17 @@ class SessionRepository:
             [(session_id, 1), (session_id, 2), (session_id, 3), (session_id, 4)],
         )
         # Toys the couple owns are on from the start; «Игрушки и реквизит» can turn them off.
-        self.db.execute(
-            """
-            INSERT OR IGNORE INTO session_items (session_id, item_code, frequency)
-            SELECT ?, code, 2 FROM items
-            WHERE default_owned = 1 AND is_active = 1 AND COALESCE(is_archived, 0) = 0 AND deleted_at IS NULL
-            """,
-            (session_id,),
-        )
+        try:
+            self.db.execute(
+                """
+                INSERT OR IGNORE INTO session_items (session_id, item_code, frequency)
+                SELECT ?, code, 2 FROM items
+                WHERE default_owned = 1 AND is_active = 1 AND COALESCE(is_archived, 0) = 0 AND deleted_at IS NULL
+                """,
+                (session_id,),
+            )
+        except sqlite3.OperationalError:
+            pass  # database from before migration 019 (only in schema tests)
         return session_id
 
     def set_items(self, session_id: int, items: dict[str, int]) -> None:

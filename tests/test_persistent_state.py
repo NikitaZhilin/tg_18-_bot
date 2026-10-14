@@ -45,21 +45,23 @@ def test_inventory_and_boundary_drafts_survive_service_recreation(tmp_path):
     config = make_config(tmp_path)
     service = GameService(db, config)
     service.ensure_session(-100, 7)
+    owned = service.inventory_draft(-100, 7, 111)  # the couple's toys are on by default
+    assert owned and "ice" not in owned
 
-    assert service.toggle_inventory_draft(-100, 7, 111, "ice") == {"ice": 1}
+    assert service.toggle_inventory_draft(-100, 7, 111, "ice") == {**owned, "ice": 1}
     assert service.toggle_boundaries_draft(-100, 7, 111, "impact") == {"impact"}
 
     restarted_service = GameService(db, config)
-    assert restarted_service.inventory_draft(-100, 7, 111) == {"ice": 1}
+    assert restarted_service.inventory_draft(-100, 7, 111) == {**owned, "ice": 1}
     assert restarted_service.boundaries_draft(-100, 7, 111) == {"impact"}
 
     restarted_service.ensure_session(-100, 8)
-    assert restarted_service.inventory_draft(-100, 8, 111) == {}
+    assert restarted_service.inventory_draft(-100, 8, 111) == owned
     assert restarted_service.boundaries_draft(-100, 8, 111) == set()
 
     restarted_service.save_inventory_draft(-100, 7, 111)
     restarted_service.save_boundaries_draft(-100, 7, 111)
-    assert restarted_service.items_for_active_session(-100, 7) == {"ice": 1}
+    assert restarted_service.items_for_active_session(-100, 7) == {**owned, "ice": 1}
     assert restarted_service.boundaries_for_active_session(-100, 7) == {"impact"}
     assert db.fetchone(
         "SELECT 1 FROM session_setting_drafts WHERE user_id = 111 AND session_id = 1"
