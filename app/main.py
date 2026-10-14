@@ -17,6 +17,7 @@ from app.handlers import (
     admin_operations,
     desires,
     errors,
+    fallback,
     feedback,
     game,
     game_settings,
@@ -87,6 +88,7 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     dp.include_router(feedback.router)
     dp.include_router(game_settings.router)
     dp.include_router(game.router)
+    dp.include_router(fallback.router)
     return dp
 
 

@@ -39,12 +39,18 @@ def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
 
 
 @router.message(Command("admin"))
-async def cmd_admin(message: Message, config: Config, game_service: GameService) -> None:
+async def cmd_admin(
+    message: Message,
+    config: Config,
+    game_service: GameService,
+    state: FSMContext,
+) -> None:
     if await reject_if_not_allowed(message, config):
         return
     if not message.from_user or not config.is_admin(message.from_user.id):
         await message.answer("Админка недоступна.")
         return
+    await state.clear()
     game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
     await message.answer(
         "Админка контента",

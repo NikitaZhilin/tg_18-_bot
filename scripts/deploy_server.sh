@@ -144,7 +144,8 @@ for _ in $(seq 1 18); do
   sleep 5
 done
 if [ "$healthy" -ne 1 ]; then
-  journalctl -u "$SERVICE_NAME" -n 100 --no-pager
+  # The CI log is public: show only the last lines, with ids masked.
+  journalctl -u "$SERVICE_NAME" -n 40 --no-pager -o cat | sed -E 's/[0-9]{5,}/<id>/g'
   exit 1
 fi
 

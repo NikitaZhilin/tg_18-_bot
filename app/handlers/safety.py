@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.config import Config
@@ -19,9 +20,15 @@ END_GAME_TEXT = (
 
 
 @router.message(Command("stopword"))
-async def cmd_stopword(message: Message, config: Config, safety_service: SafetyService) -> None:
+async def cmd_stopword(
+    message: Message,
+    config: Config,
+    safety_service: SafetyService,
+    state: FSMContext,
+) -> None:
     if await reject_if_not_allowed(message, config):
         return
+    await state.clear()
     user_id = message.from_user.id if message.from_user else None
     safety_service.stopword(message.chat.id, message_thread_id(message), user_id)
     await message.answer(STOPWORD_TEXT, reply_markup=main_menu())
