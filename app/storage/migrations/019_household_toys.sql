@@ -61,7 +61,7 @@ UPDATE items SET default_owned = 1 WHERE code IN (
     'dildo_large', 'dildo_heated', 'dildo_mini', 'tentacle', 'vibrator', 'clit_suction',
     'whip', 'rope', 'gag', 'anal_plug_s', 'anal_plug_m', 'anal_plug_l', 'inflatable_plug',
     'suction_cups', 'sterile_urethral_kit', 'cock_ring', 'penis_sleeve', 'masturbator',
-    'speculum', 'anal_hook', 'estim', 'massage_candle', 'strapon', 'lubricant'
+    'speculum', 'anal_hook', 'estim', 'massage_candle', 'strapon', 'lubricant', 'blindfold'
 );
 
 -- The game that is already open gets them too, unless props were set by hand.

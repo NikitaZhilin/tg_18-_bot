@@ -424,5 +424,6 @@ def test_new_game_starts_with_the_couples_toys(tmp_path):
         for row in db.fetchall("SELECT item_code FROM session_items WHERE session_id = ?", (session["id"],))
     }
     assert {"rope", "strapon", "dildo_mini", "anal_plug_s", "anal_plug_m", "anal_plug_l", "estim"} <= owned
-    assert "blindfold" not in owned  # not in the couple's list
+    assert "blindfold" in owned
+    assert "soft_cuffs" not in owned  # not in the couple's list
     db.close()

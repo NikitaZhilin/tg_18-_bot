@@ -39,7 +39,7 @@ def test_cards_export_is_russian_editable_and_round_trips(tmp_path):
     )
 
     report = service.import_content(111, str(path), dry_run=True)
-    assert report.added_or_updated == 386
+    assert report.added_or_updated == 473
     assert report.items_added_or_updated == 36
     assert report.warnings_count == 0
     db.close()
