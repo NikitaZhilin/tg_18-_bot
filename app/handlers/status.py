@@ -6,7 +6,8 @@ from aiogram.types import Message
 
 from app.config import Config
 from app.handlers.common import message_thread_id, reject_if_not_allowed
-from app.keyboards.game import reset_confirm
+from app.handlers.safety import END_GAME_QUESTION
+from app.keyboards.game import end_game_confirm
 from app.services.game_service import GameService
 
 router = Router(name="status")
@@ -38,4 +39,4 @@ async def cmd_status(message: Message, config: Config, game_service: GameService
 async def cmd_reset(message: Message, config: Config) -> None:
     if await reject_if_not_allowed(message, config):
         return
-    await message.answer("Завершить текущую сессию?", reply_markup=reset_confirm())
+    await message.answer(END_GAME_QUESTION, reply_markup=end_game_confirm())

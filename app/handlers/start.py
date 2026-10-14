@@ -7,10 +7,30 @@ from aiogram.types import Message
 
 from app.config import Config
 from app.handlers.common import message_thread_id, reject_if_not_allowed
-from app.keyboards.game import consent_menu, main_menu
+from app.handlers.screens import home
+from app.keyboards.game import consent_menu
 from app.services.game_service import GameError, GameService
 
 router = Router(name="start")
+
+PLAYER_HELP = (
+    "Как играть\n"
+    "• «Выбрать карточку» — уровень, интенсивность и тип карточки.\n"
+    "• «Русская рулетка» — случайная карточка из уровней, выбранных в настройках.\n"
+    "• На карточке: «Готово» — передать ход, «Заменить» — другая карточка, "
+    "«На доработку» — убрать непонятную карточку из игры.\n"
+    "• «Настройки» — уровни рулетки, реквизит и границы на сегодня.\n\n"
+    "Команды\n"
+    "/start — меню игры\n"
+    "/stopword — мгновенно остановить игру\n"
+    "/help — эта справка\n\n"
+    "Если кнопка не отвечает или устарела, наберите /start."
+)
+ADMIN_HELP = (
+    "\n\nДля владельцев\n"
+    "/admin — админка карточек и реквизита\n"
+    "/status — технический статус игры"
+)
 
 
 @router.message(CommandStart())
@@ -25,26 +45,22 @@ async def cmd_start(
     if await state.get_state() is not None:
         await state.clear()
         await message.answer("Незаконченное действие в админке отменено.")
+    thread_id = message_thread_id(message)
     try:
-        game_service.ensure_session(message.chat.id, message_thread_id(message), message.chat.title)
+        game_service.ensure_session(message.chat.id, thread_id, message.chat.title)
     except GameError as exc:
         await message.answer(str(exc))
         return
-    if game_service.has_base_consent(message.chat.id, message_thread_id(message)):
-        status = game_service.status(message.chat.id, message_thread_id(message))
-        await message.answer(
-            "Игра уже подтверждена. Текущий прогресс сохранен.",
-            reply_markup=main_menu(
-                has_active_turn=bool(status["has_active_turn"]),
-                restricted_enabled=bool(status["restricted_content"]),
-                enabled_levels=tuple(status["enabled_levels"]),
-            ),
-        )
+    if game_service.has_base_consent(message.chat.id, thread_id):
+        user_id = message.from_user.id if message.from_user else None
+        text, markup = home(game_service, config, message.chat.id, thread_id, user_id)
+        await message.answer(text, reply_markup=markup)
         return
+    player_name = game_service.next_consent_label(message.chat.id, thread_id)
     await message.answer(
         "Игра только для взрослых партнеров по взаимному согласию.\n"
-        "Стоп-слово доступно в любой момент.",
-        reply_markup=consent_menu(),
+        "Стоп-слово доступно в любой момент: /stopword.",
+        reply_markup=consent_menu(player_name),
     )
 
 
@@ -52,11 +68,5 @@ async def cmd_start(
 async def cmd_help(message: Message, config: Config) -> None:
     if await reject_if_not_allowed(message, config):
         return
-    await message.answer(
-        "/start - старт и меню\n"
-        "/status - статус бота и сессии\n"
-        "/admin - админка контента\n"
-        "/reset - завершить сессию с подтверждением\n"
-        "/stopword - мгновенно остановить игру\n\n"
-        "Если кнопка не отвечает или устарела, наберите /start."
-    )
+    is_admin = bool(message.from_user and config.is_admin(message.from_user.id))
+    await message.answer(PLAYER_HELP + (ADMIN_HELP if is_admin else ""))

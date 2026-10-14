@@ -5,7 +5,8 @@ from aiogram.types import CallbackQuery
 
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
-from app.keyboards.game import boundary_menu, main_menu_for_status
+from app.handlers.screens import show_screen
+from app.keyboards.game import boundary_menu, settings_menu
 from app.keyboards.inventory import inventory_menu
 from app.services.game_service import GameError, GameService
 
@@ -19,8 +20,9 @@ def _chat_id(callback: CallbackQuery) -> int:
     return callback.message.chat.id
 
 
-def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    return main_menu_for_status(game_service.status(chat_id, thread_id))
+def _settings(game_service: GameService, chat_id: int, thread_id: int | None):
+    status = game_service.status(chat_id, thread_id)
+    return settings_menu(tuple(status.get("enabled_levels") or (1, 2, 3, 4)))
 
 
 @router.callback_query(F.data == "inv:menu")
@@ -37,9 +39,10 @@ async def cb_inventory(callback: CallbackQuery, config: Config, game_service: Ga
         callback_thread_id(callback),
         callback.from_user.id,
     )
-    await callback.message.answer(
+    await show_screen(
+        callback,
         "Настройте реквизит. Нажатие меняет частоту: выключен → редко → иногда → часто.",
-        reply_markup=inventory_menu(game_service.available_items(), selected),
+        inventory_menu(game_service.available_items(), selected),
     )
     await answer_callback(callback)
 
@@ -69,9 +72,10 @@ async def cb_inventory_save(callback: CallbackQuery, config: Config, game_servic
         callback_thread_id(callback),
         callback.from_user.id,
     )
-    await callback.message.answer(
-        "Реквизит и частота выпадения сохранены для текущей сессии.",
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+    await show_screen(
+        callback,
+        "Реквизит и частота выпадения сохранены для этой игры.",
+        _settings(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
     await answer_callback(callback)
 
@@ -90,7 +94,7 @@ async def cb_boundaries(callback: CallbackQuery, config: Config, game_service: G
         callback_thread_id(callback),
         callback.from_user.id,
     )
-    await callback.message.answer("Что сегодня точно исключаем?", reply_markup=boundary_menu(selected))
+    await show_screen(callback, "Что сегодня точно исключаем?", boundary_menu(selected))
     await answer_callback(callback)
 
 
@@ -121,8 +125,9 @@ async def cb_boundaries_save(callback: CallbackQuery, config: Config, game_servi
         callback_thread_id(callback),
         callback.from_user.id,
     )
-    await callback.message.answer(
+    await show_screen(
+        callback,
         "Границы сохранены.",
-        reply_markup=_main_menu(game_service, _chat_id(callback), callback_thread_id(callback)),
+        _settings(game_service, _chat_id(callback), callback_thread_id(callback)),
     )
     await answer_callback(callback)

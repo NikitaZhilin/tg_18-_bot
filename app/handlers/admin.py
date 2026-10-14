@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import Config
 from app.handlers.admin_states import AdminAddCard
+from app.handlers.screens import home, show_screen
 from app.handlers.common import answer_callback, message_thread_id, reject_callback_if_not_admin, reject_callback_if_not_allowed, reject_if_not_allowed
 from app.keyboards.admin import (
     admin_menu,
@@ -21,7 +22,6 @@ from app.keyboards.admin import (
     save_choice,
     timer_choice,
 )
-from app.keyboards.game import main_menu_for_status
 from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, LEVEL_NAMES, RISK_TAG_NAMES
 from app.services.admin_service import AdminService
 from app.services.game_service import GameService
@@ -32,10 +32,6 @@ router = Router(name="admin")
 def _admin_menu(game_service: GameService, chat_id: int, thread_id: int | None):
     status = game_service.status(chat_id, thread_id)
     return admin_menu(restricted_enabled=bool(status.get("restricted_content", False)))
-
-
-def _main_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    return main_menu_for_status(game_service.status(chat_id, thread_id))
 
 
 @router.message(Command("admin"))
@@ -90,10 +86,14 @@ async def cb_admin_home(
     if await reject_callback_if_not_allowed(callback, config):
         return
     await state.clear()
-    await callback.message.answer(
-        "Главное меню",
-        reply_markup=_main_menu(game_service, callback.message.chat.id, message_thread_id(callback.message)),
+    text, markup = home(
+        game_service,
+        config,
+        callback.message.chat.id,
+        message_thread_id(callback.message),
+        callback.from_user.id,
     )
+    await show_screen(callback, text, markup)
     await answer_callback(callback)
 
 

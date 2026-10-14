@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 from app.config import Config
 from app.handlers.common import answer_callback, callback_thread_id, reject_callback_if_not_allowed
 from app.keyboards.desires import desire_actions, desire_list
-from app.keyboards.game import main_menu_for_status
+from app.handlers.screens import home, show_screen
 from app.services.desire_service import DesireError, DesireService
 from app.services.game_service import GameService
 
@@ -20,10 +20,8 @@ def _chat_id(callback: CallbackQuery) -> int:
     return callback.message.chat.id
 
 
-def _main_menu(game_service: GameService, callback: CallbackQuery):
-    return main_menu_for_status(
-        game_service.status(_chat_id(callback), callback_thread_id(callback))
-    )
+def _home(game_service: GameService, config: Config, callback: CallbackQuery):
+    return home(game_service, config, _chat_id(callback), callback_thread_id(callback), callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("game:desires"))
@@ -48,15 +46,14 @@ async def cb_desires(
         await answer_callback(callback, str(exc), show_alert=True)
         return
     if not rows:
-        await callback.message.answer(
-            "Сохраненных желаний пока нет.",
-            reply_markup=_main_menu(game_service, callback),
-        )
+        text, markup = _home(game_service, config, callback)
+        await show_screen(callback, f"Сохранённых желаний пока нет.\n\n{text}", markup)
         await answer_callback(callback)
         return
-    await callback.message.answer(
-        f"Сохраненные желания: {total}. Страница {page + 1}.",
-        reply_markup=desire_list(
+    await show_screen(
+        callback,
+        f"Сохранённые желания: {total}. Страница {page + 1}.",
+        desire_list(
             rows,
             page=page,
             total=total,
@@ -83,11 +80,12 @@ async def cb_desire(callback: CallbackQuery, config: Config, desire_service: Des
     if not desire:
         await answer_callback(callback, "Желание уже использовано или не найдено.", show_alert=True)
         return
-    await callback.message.answer(
+    await show_screen(
+        callback,
         f"Желание для: {desire_service.player_label(str(desire['owner_slot']))}\n\n"
         f"{desire['title'] or 'Без отдельного названия'}\n\n"
         f"{desire['text']}",
-        reply_markup=desire_actions(int(desire_id), int(page)),
+        desire_actions(int(desire_id), int(page)),
     )
     await answer_callback(callback)
 
@@ -112,8 +110,6 @@ async def cb_desire_use(
     except DesireError as exc:
         await answer_callback(callback, str(exc), show_alert=True)
         return
-    await callback.message.answer(
-        f"Желание использовано:\n\n{desire['text']}",
-        reply_markup=_main_menu(game_service, callback),
-    )
+    text, markup = _home(game_service, config, callback)
+    await show_screen(callback, f"Желание использовано:\n\n{desire['text']}\n\n{text}", markup)
     await answer_callback(callback)
