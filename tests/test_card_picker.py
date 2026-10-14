@@ -412,3 +412,17 @@ def test_game_starts_without_consent_screen_by_default(tmp_path):
     result = service.draw_card(10, None, 111, level=1, category="task", intensity="light")
     assert result.card.level == 1
     db.close()
+
+
+def test_new_game_starts_with_the_couples_toys(tmp_path):
+    db = migrated_db(tmp_path)
+    import_seed(db)
+    service = GameService(db, make_config(tmp_path))
+    session = service.ensure_session(10, None)
+    owned = {
+        row["item_code"]
+        for row in db.fetchall("SELECT item_code FROM session_items WHERE session_id = ?", (session["id"],))
+    }
+    assert {"rope", "strapon", "dildo_mini", "anal_plug_s", "anal_plug_m", "anal_plug_l", "estim"} <= owned
+    assert "blindfold" not in owned  # not in the couple's list
+    db.close()

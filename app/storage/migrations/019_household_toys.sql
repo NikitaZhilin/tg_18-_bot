@@ -13,8 +13,12 @@ INSERT OR IGNORE INTO items (code, name, min_level, max_level, categories, usage
      'Только ягодицы, бёдра и верх спины; мимо поясницы, позвоночника и лица.', 0),
     ('gag', 'Кляп', 4, 4, 'task',
      'Нос должен дышать свободно. Вместо стоп-слова — бросить предмет из руки. Не дольше десяти минут.', 0),
-    ('anal_plug', 'Анальная пробка', 3, 4, 'task,pose',
-     'Только пробка с широким основанием, много лубриканта, вводить медленно.', 1),
+    ('anal_plug_s', 'Анальная пробка — маленькая', 2, 4, 'task,pose',
+     'Широкое основание, много лубриканта, вводить медленно на выдохе.', 1),
+    ('anal_plug_m', 'Анальная пробка — средняя', 3, 4, 'task,pose',
+     'Сначала разогрев пальцами или маленькой пробкой, много лубриканта.', 1),
+    ('anal_plug_l', 'Анальная пробка — большая', 3, 4, 'task',
+     'Только после средней и хорошего разогрева, очень медленно, без усилия.', 0),
     ('inflatable_plug', 'Надувная пробка', 3, 4, 'task',
      'Много лубриканта; накачивать по одному нажатию и спрашивать после каждого.', 0),
     ('suction_cups', 'Вакуумные насадки', 3, 4, 'task',
@@ -29,6 +33,10 @@ INSERT OR IGNORE INTO items (code, name, min_level, max_level, categories, usage
      'Много лубриканта; верёвку от крюка крепить к запястьям с запасом, не натягивать и не дёргать.', 0),
     ('massage_candle', 'Свеча для массажа', 2, 4, 'task',
      'Только специальная массажная свеча. Задуйте её и проверьте масло на своём запястье.', 0),
+    ('strapon', 'Страпон', 3, 4, 'task,pose',
+     'Много лубриканта; для анального проникновения — после разогрева пальцами или мини-фаллосом.', 1),
+    ('dildo_mini', 'Мини-фаллос', 2, 4, 'task,pose',
+     'Удобен для первого анального опыта и разогрева. Много лубриканта.', 1),
     ('estim', 'Электростимулятор', 3, 4, 'task',
      'Только ниже пояса, никогда через грудь, шею и голову. Не при кардиостимуляторе, болезнях сердца, эпилепсии и беременности, не в воде. Начинать с минимума.', 0);
 
@@ -45,3 +53,21 @@ INSERT OR IGNORE INTO items (code, name, min_level, max_level, categories, usage
     ('speculum', 'Расширитель', 4, 4, 'task',
      'Много лубриканта, раскрывать медленно и только по команде принимающего; при боли сразу закрыть.', 0);
 UPDATE items SET name = 'Уретральные бужи (стерильные)' WHERE code = 'sterile_urethral_kit';
+
+
+-- Toys the couple already owns: every new game starts with them enabled.
+ALTER TABLE items ADD COLUMN default_owned INTEGER NOT NULL DEFAULT 0 CHECK (default_owned IN (0, 1));
+UPDATE items SET default_owned = 1 WHERE code IN (
+    'dildo_large', 'dildo_heated', 'dildo_mini', 'tentacle', 'vibrator', 'clit_suction',
+    'whip', 'rope', 'gag', 'anal_plug_s', 'anal_plug_m', 'anal_plug_l', 'inflatable_plug',
+    'suction_cups', 'sterile_urethral_kit', 'cock_ring', 'penis_sleeve', 'masturbator',
+    'speculum', 'anal_hook', 'estim', 'massage_candle', 'strapon', 'lubricant'
+);
+
+-- The game that is already open gets them too, unless props were set by hand.
+INSERT OR IGNORE INTO session_items (session_id, item_code, frequency)
+SELECT s.id, i.code, 2
+FROM sessions s
+JOIN items i ON i.default_owned = 1
+WHERE s.status IN ('draft', 'active')
+  AND NOT EXISTS (SELECT 1 FROM session_items si WHERE si.session_id = s.id);
