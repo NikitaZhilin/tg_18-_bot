@@ -92,6 +92,24 @@ class Config:
         actual = hashlib.sha256(password.encode("utf-8")).hexdigest()
         return hmac.compare_digest(actual, self.admin_content_password_sha256.lower())
 
+    def runtime_warnings(self) -> list[str]:
+        warnings: list[str] = []
+        expected = 1 if self.single_account_two_players else 2
+        if len(self.allowed_user_ids) > expected:
+            ids = sorted(self.allowed_user_ids)
+            warnings.append(
+                f"ALLOWED_TELEGRAM_USER_IDS has {len(ids)} ids, but the game uses only "
+                f"{expected}: players are {ids[:expected]} (smallest ids). "
+                "Other ids can open the bot but never get a turn."
+            )
+        missing_admins = sorted(self.admin_user_ids - self.allowed_user_ids)
+        if missing_admins and not self.allow_unlisted_users:
+            warnings.append(
+                f"ADMIN_TELEGRAM_USER_IDS {missing_admins} are not in ALLOWED_TELEGRAM_USER_IDS "
+                "and cannot open the admin panel."
+            )
+        return warnings
+
     def validate_for_runtime(self) -> None:
         if not self.dry_run and not self.bot_token:
             raise RuntimeError("BOT_TOKEN is required unless DRY_RUN=true")

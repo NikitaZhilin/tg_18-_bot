@@ -16,6 +16,7 @@ from app.handlers import (
     admin_items,
     admin_operations,
     desires,
+    errors,
     feedback,
     game,
     game_settings,
@@ -74,6 +75,7 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     db = services["db"]
     assert isinstance(db, Database)
     dp = Dispatcher(storage=SQLiteFSMStorage(db), **services)
+    dp.errors.register(errors.on_error)
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)
@@ -107,6 +109,8 @@ async def run_async() -> None:
     config = Config.from_env()
     configure_logging(config.log_level)
     config.validate_for_runtime()
+    for warning in config.runtime_warnings():
+        logger.warning(warning)
     db, services = build_services(config)
 
     import_startup_content(db)
@@ -122,6 +126,16 @@ async def run_async() -> None:
         session=session,
         default=DefaultBotProperties(parse_mode=None),
     )
+    try:
+        me = await bot.get_me()
+    except Exception:
+        logger.exception(
+            "cannot reach Telegram: check BOT_TOKEN, network and TELEGRAM_PROXY_URL"
+        )
+        await bot.session.close()
+        db.close()
+        raise
+    logger.info("connected to Telegram as @%s", me.username)
     dp = build_dispatcher(services)
     timer_service = services["timer_service"]
     assert isinstance(timer_service, TimerService)

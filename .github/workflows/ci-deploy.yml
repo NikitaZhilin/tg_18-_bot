@@ -3,14 +3,15 @@ name: CI and deploy
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -37,10 +38,17 @@ jobs:
           DATA_DIR: .tmp/ci-data
           DATABASE_PATH: .tmp/ci-data/import.sqlite3
       - run: python scripts/smoke_start.py
-      - run: python -m pytest
+      - name: Run tests
+        run: |
+          set +e
+          python -B -m pytest -q -rfE --tb=line 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          grep -E "^(FAILED|ERROR) " pytest.log | head -30 | while IFS= read -r l; do echo "::error::$l"; done
+          exit $status
 
   deploy:
     needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
