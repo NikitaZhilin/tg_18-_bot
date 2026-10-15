@@ -13,7 +13,7 @@ def test_card_catalog_archives_and_soft_deletes_without_breaking_history(tmp_pat
         "INSERT INTO users (telegram_id, display_name, role) VALUES (111, 'Админ', 'player_1')"
     )
     service = AdminService(db)
-    card = db.fetchone("SELECT id FROM cards WHERE external_id = 'task_l1_v2_001'")
+    card = db.fetchone("SELECT id FROM cards WHERE external_id = 'task_l1_v2_002'")
     card_id = int(card["id"])
 
     service.archive_card(111, card_id, True)

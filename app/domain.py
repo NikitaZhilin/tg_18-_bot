@@ -52,6 +52,7 @@ class PickFilter:
     intensity: str | None = None
     collection_code: str | None = None
     allow_restricted_content: bool = False
+    allow_repeats: bool = False
 
 
 @dataclass(frozen=True)

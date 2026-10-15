@@ -53,7 +53,8 @@ def test_game_keyboards_have_main_menu_and_dynamic_modes():
     assert "game:home" in _callbacks(level_menu())
     assert "game:home" in _callbacks(intensity_menu(3))
     assert "game:home" in _callbacks(card_actions(1, True))
-    assert "game:replace:1" in _callbacks(card_actions(1, True))
+    assert "game:refuse:1" in _callbacks(card_actions(1, True))
+    assert "game:refuse:1" not in _callbacks(card_actions(1, True, is_penalty=True))
     assert "game:revision:1" in _callbacks(card_actions(1, True))
     texts = [
         button.text

@@ -26,10 +26,10 @@ class CardPicker:
             "c.is_archived = 0",
             "c.deleted_at IS NULL",
             """
-            NOT EXISTS (
+            (? OR NOT EXISTS (
                 SELECT 1 FROM used_cards u
                 WHERE u.session_id = ? AND u.card_id = c.id
-            )
+            ))
             """,
             """
             NOT EXISTS (
@@ -41,7 +41,7 @@ class CardPicker:
             )
             """,
         ]
-        params: list[object] = [filters.session_id, filters.session_id]
+        params: list[object] = [int(filters.allow_repeats), filters.session_id, filters.session_id]
         if filters.level is not None:
             where.append("c.level = ?")
             params.append(filters.level)
@@ -52,6 +52,9 @@ class CardPicker:
         if filters.category is not None:
             where.append("c.category = ?")
             params.append(filters.category)
+        else:
+            # Penalties come only as a forfeit for a refused card.
+            where.append("c.category != 'penalty'")
         if filters.intensity is not None:
             where.append("c.intensity = ?")
             params.append(filters.intensity)
