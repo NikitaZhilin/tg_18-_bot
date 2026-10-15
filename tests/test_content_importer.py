@@ -59,7 +59,7 @@ def test_restricted_content_imports_into_closed_collection(tmp_path):
           AND c.is_enabled = 1
         """
     )
-    assert row["count"] == 17
+    assert row["count"] == 18
     drafts = db.fetchall(
         """
         SELECT external_id, review_status, is_enabled

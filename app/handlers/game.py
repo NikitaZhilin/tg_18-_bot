@@ -320,6 +320,27 @@ async def cb_extreme(callback: CallbackQuery, config: Config, game_service: Game
     )
 
 
+@router.callback_query(F.data == "game:extreme_toggle")
+async def cb_extreme_toggle(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    chat_id, thread_id = _where(callback)
+    try:
+        _ensure_game(callback, game_service)
+        enabled = game_service.toggle_extreme(chat_id, thread_id)
+    except GameError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    note = (
+        "🔞 Экстрим включён: его карточки могут выпасть в любой игре, а кнопка «🔞 Экстрим» даёт только их."
+        if enabled
+        else "🔞 Экстрим выключен: его карточки больше не выпадают."
+    )
+    text, markup = home(game_service, config, chat_id, thread_id, callback.from_user.id)
+    await show_screen(callback, f"{note}\n\n{text}", markup)
+    await answer_callback(callback)
+
+
 @router.callback_query(F.data.startswith("game:roulette_level:"))
 async def cb_roulette_level(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
     if await reject_callback_if_not_allowed(callback, config):

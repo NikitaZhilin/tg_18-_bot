@@ -183,7 +183,7 @@ def test_extreme_cards_are_always_available(tmp_path):
         category=None,
         collection_code="restricted_content",
     )
-    assert result.card.external_id.startswith("restricted_")
+    assert result.card.external_id.startswith("extreme_v2_")
     assert result.card.level == 4
     assert result.card.intensity == "hard"
     assert format_card(result.card).startswith("🔞 Экстрим ·")
@@ -233,7 +233,7 @@ def test_inventory_frequency_and_required_item_are_saved_with_turn(tmp_path):
     db = migrated_db(tmp_path)
     import_restricted_seed(db)
     db.execute("UPDATE cards SET is_enabled = 0")
-    db.execute("UPDATE cards SET is_enabled = 1 WHERE external_id = 'restricted_l4_hard_fisting_001'")
+    db.execute("UPDATE cards SET is_enabled = 1, review_status = 'approved' WHERE external_id = 'restricted_l4_hard_fisting_001'")
     service = GameService(db, make_config(tmp_path))
     service.ensure_session(10, None)
     service.accept_base_consent(10, None, 111)
