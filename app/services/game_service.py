@@ -64,7 +64,7 @@ class GameService(SessionSettingsMixin):
             return
         names = [self.config.player_1_name, self.config.player_2_name]
         roles = ["player_1", "player_2"]
-        users_to_register = ids[:1] if self.config.single_account_two_players else ids[:2]
+        users_to_register = ids[:2]
         for index, user_id in enumerate(users_to_register):
             self.users.upsert_user(user_id, names[index] if index < len(names) else str(user_id), roles[index])
 
@@ -76,17 +76,7 @@ class GameService(SessionSettingsMixin):
         if active:
             self._restore_daily_consents(active)
             return active
-        player_ids = sorted(self.config.allowed_user_ids)
-        if self.config.single_account_two_players:
-            if not player_ids:
-                raise GameError("Нужно указать ALLOWED_TELEGRAM_USER_IDS")
-            player_1_id = player_ids[0]
-            player_2_id = player_ids[0]
-        elif len(player_ids) < 2:
-            raise GameError("Нужно указать два ALLOWED_TELEGRAM_USER_IDS")
-        else:
-            player_1_id = player_ids[0]
-            player_2_id = player_ids[1]
+        player_1_id, player_2_id = self._players_for_chat(chat_id)
         session_id = self.sessions.create(
             chat_key,
             player_1_id,
@@ -97,6 +87,27 @@ class GameService(SessionSettingsMixin):
         session = self.db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
         self._restore_daily_consents(session)
         return session
+
+    def _players_for_chat(self, chat_id: int) -> tuple[int, int]:
+        """Who plays in this chat.
+
+        A private chat with the bot belongs to its owner: both partners share one
+        phone, so both player slots are that account. A group is played from two
+        phones, so the two allowed accounts take turns there.
+        """
+        player_ids = sorted(self.config.allowed_user_ids)
+        if chat_id > 0 and chat_id in self.config.allowed_user_ids:
+            return chat_id, chat_id
+        if len(player_ids) >= 2 and (chat_id < 0 or not self.config.single_account_two_players):
+            return player_ids[0], player_ids[1]
+        if self.config.single_account_two_players and player_ids:
+            return player_ids[0], player_ids[0]
+        if chat_id < 0:
+            raise GameError(
+                "Для игры в группе боту нужны два аккаунта: добавьте второй Telegram ID "
+                "в ALLOWED_TELEGRAM_USER_IDS на сервере."
+            )
+        raise GameError("Нужно указать два ALLOWED_TELEGRAM_USER_IDS")
 
     def active_session(self, chat_id: int, thread_id: int | None) -> sqlite3.Row | None:
         return self.sessions.get_active(self.sessions.chat_key(chat_id, thread_id))
@@ -174,7 +185,7 @@ class GameService(SessionSettingsMixin):
             ):
                 raise GameError(BASE_CONSENT_REQUIRED)
             if int(session["current_player_id"]) != int(user_id):
-                raise GameError("Сейчас ход другого игрока")
+                raise GameError(f"Сейчас очередь: {self._player_label(session['current_player_slot'])}")
             if session["active_turn_id"]:
                 raise GameError("Сначала завершите текущую карточку или откройте ее кнопкой «Продолжить карточку»")
             if source == "penalty" and not bool(session["allow_penalties"]):

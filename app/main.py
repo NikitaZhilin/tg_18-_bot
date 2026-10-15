@@ -22,6 +22,7 @@ from app.handlers import (
     feedback,
     game,
     game_settings,
+    membership,
     safety,
     start,
     status,
@@ -78,6 +79,7 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     assert isinstance(db, Database)
     dp = Dispatcher(storage=SQLiteFSMStorage(db), **services)
     dp.errors.register(errors.on_error)
+    dp.include_router(membership.router)
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)

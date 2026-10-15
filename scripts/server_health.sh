@@ -70,6 +70,32 @@ echo "OFFSITE_LAST_RUN: ${offsite_last:-never} (${offsite_result:-?})"
 
 PY="$APP_DIR/.venv/bin/python"
 [ -x "$PY" ] || PY=python3
+# Players and Telegram settings: counts and flags only, no ids.
+(cd "$APP_DIR" 2>/dev/null && "$PY" - <<'PLAYERS' 2>&1 | mask)
+import json
+import urllib.request
+
+from app.config import Config
+
+c = Config.from_env()
+print("PLAYERS_MODE: %s" % ("single_account" if c.single_account_two_players else "two_accounts"))
+print("ALLOWED_USERS_COUNT: %s" % len(c.allowed_user_ids))
+print("ALLOW_UNLISTED_USERS: %s" % c.allow_unlisted_users)
+print("GROUP_PLAY: %s" % ("ready" if len(c.allowed_user_ids) >= 2 else "needs a second allowed account"))
+if len(c.allowed_user_ids) > 2:
+    print("WARN: more than two allowed accounts")
+if c.telegram_proxy_url:
+    print("BOT_GROUPS: unknown (proxy configured)")
+else:
+    try:
+        with urllib.request.urlopen("https://api.telegram.org/bot%s/getMe" % c.bot_token, timeout=10) as resp:
+            me = json.load(resp)["result"]
+        print("BOT_CAN_JOIN_GROUPS: %s" % me.get("can_join_groups"))
+        print("BOT_READS_ALL_GROUP_MESSAGES: %s" % me.get("can_read_all_group_messages"))
+    except Exception as exc:
+        print("BOT_GROUPS: check failed (%s)" % type(exc).__name__)
+PLAYERS
+
 DB_PATH="$(cd "$APP_DIR" 2>/dev/null && "$PY" -c 'from app.config import Config; print(Config.from_env().database_path.resolve())' 2>/dev/null)"
 if [ -z "$DB_PATH" ] || [ ! -f "$DB_PATH" ]; then
   echo "WARN: database not found"
@@ -104,6 +130,9 @@ if isinstance(failed, int) and failed:
     print("WARN: %s timer notifications could not be delivered in 7 days" % failed)
 if isinstance(stuck, int) and stuck:
     print("WARN: %s timers are overdue and not delivered" % stuck)
+print("CHATS_PRIVATE: %s" % one("SELECT COUNT(*) FROM chat_contexts WHERE telegram_chat_id > 0"))
+print("CHATS_GROUP: %s" % one("SELECT COUNT(*) FROM chat_contexts WHERE telegram_chat_id < 0"))
+print("OPEN_GAMES_ONE_ACCOUNT: %s" % one("SELECT COUNT(*) FROM sessions WHERE status IN ('draft','active') AND player_1_id = player_2_id"))
 open_reports = one("SELECT COUNT(*) FROM card_feedback WHERE status = 'new'")
 print("UNCLEAR_CARD_REPORTS_OPEN: %s" % open_reports)
 PY
