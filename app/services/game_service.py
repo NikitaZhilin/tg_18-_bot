@@ -24,6 +24,7 @@ BASE_CONSENT_REQUIRED = "Нужно подтвердить согласие пе
 class DrawResult:
     turn_id: int
     card: PickedCard
+    play_mode: str | None = None
 
 
 class GameService(SessionSettingsMixin):
@@ -264,7 +265,7 @@ class GameService(SessionSettingsMixin):
                 "UPDATE sessions SET active_turn_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (turn_id, session["id"]),
             )
-        return DrawResult(turn_id, card)
+        return DrawResult(turn_id, card, play_mode)
 
     def replace_active_card(
         self,
@@ -464,7 +465,7 @@ class GameService(SessionSettingsMixin):
             )
         if replacement is None or new_turn_id is None:  # pragma: no cover - guarded above
             return None
-        return DrawResult(new_turn_id, replacement)
+        return DrawResult(new_turn_id, replacement, turn["play_mode"])
 
     def draw_truth_or_dare(
         self,
@@ -502,7 +503,106 @@ class GameService(SessionSettingsMixin):
         card = self.card_picker.for_turn(int(session["active_turn_id"]))
         if not card:
             return None
-        return DrawResult(int(session["active_turn_id"]), card)
+        turn_id = int(session["active_turn_id"])
+        return DrawResult(turn_id, card, self.turn_play_mode(turn_id))
+
+    def refuse_card(self, chat_id: int, thread_id: int | None, user_id: int, turn_id: int) -> DrawResult | None:
+        """Refusing a card costs a penalty card of the same level.
+
+        Returns the penalty, or None when no penalty is left: then the card is
+        simply closed and the other player goes next.
+        """
+        chat_key = self.sessions.chat_key(chat_id, thread_id)
+        with self.db.transaction() as conn:
+            session = self.sessions.get_active(chat_key, conn)
+            if not session or not session["active_turn_id"]:
+                raise GameError("Активной карточки нет")
+            if int(session["active_turn_id"]) != int(turn_id):
+                raise GameError("Эта карточка уже обработана")
+            turn = conn.execute("SELECT * FROM turns WHERE id = ?", (turn_id,)).fetchone()
+            if not turn or turn["status"] != "active":
+                raise GameError("Карточка уже завершена")
+            if int(turn["player_id"]) != int(user_id):
+                raise GameError("Сейчас очередь другого игрока")
+            card = conn.execute("SELECT level, category FROM cards WHERE id = ?", (turn["card_id"],)).fetchone()
+            if card["category"] == "penalty":
+                raise GameError("От штрафа отказаться нельзя 😈")
+            conn.execute(
+                "UPDATE turns SET status = 'skipped', finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (turn_id,),
+            )
+            conn.execute(
+                "UPDATE timers SET status = 'cancelled', claim_token = NULL, claim_until = NULL "
+                "WHERE turn_id = ? AND status = 'active'",
+                (turn_id,),
+            )
+            level = int(card["level"])
+            penalty = None
+            for filters in (
+                dict(level=level),
+                dict(levels=tuple(range(1, level + 1))),
+                # Forfeits may repeat once all of them were played.
+                dict(level=level, allow_repeats=True),
+            ):
+                try:
+                    penalty = self.card_picker.pick(
+                        PickFilter(
+                            session_id=int(session["id"]),
+                            category="penalty",
+                            allow_restricted_content=False,
+                            **filters,
+                        ),
+                        conn,
+                    )
+                    break
+                except NoCardsAvailable:
+                    continue
+            if penalty is None:
+                current_slot = session["current_player_slot"] or "player_1"
+                next_slot = "player_2" if current_slot == "player_1" else "player_1"
+                next_player = session["player_2_id"] if next_slot == "player_2" else session["player_1_id"]
+                conn.execute(
+                    "UPDATE sessions SET active_turn_id = NULL, current_player_id = ?, current_player_slot = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (next_player, next_slot, session["id"]),
+                )
+                return None
+            turn_number = int(
+                conn.execute(
+                    "SELECT COALESCE(MAX(turn_number), 0) + 1 AS num FROM turns WHERE session_id = ?",
+                    (session["id"],),
+                ).fetchone()["num"]
+            )
+            cur = conn.execute(
+                """
+                INSERT INTO turns (
+                    session_id, turn_number, player_id, card_id, source, status,
+                    selected_level, selected_category, selected_intensity, player_slot,
+                    selected_item_code, selected_collection_code, play_mode
+                )
+                VALUES (?, ?, ?, ?, 'penalty', 'active', ?, 'penalty', NULL, ?, ?, NULL, ?)
+                """,
+                (
+                    session["id"],
+                    turn_number,
+                    user_id,
+                    penalty.id,
+                    level,
+                    turn["player_slot"],
+                    penalty.selected_item_code,
+                    turn["play_mode"],
+                ),
+            )
+            new_turn_id = int(cur.lastrowid)
+            conn.execute(
+                "INSERT OR IGNORE INTO used_cards (session_id, card_id, turn_id, used_by) VALUES (?, ?, ?, ?)",
+                (session["id"], penalty.id, new_turn_id, user_id),
+            )
+            conn.execute(
+                "UPDATE sessions SET active_turn_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (new_turn_id, session["id"]),
+            )
+        return DrawResult(new_turn_id, penalty, turn["play_mode"])
 
     def finish_turn(self, chat_id: int, thread_id: int | None, user_id: int, status: str = "completed") -> str:
         chat_key = self.sessions.chat_key(chat_id, thread_id)

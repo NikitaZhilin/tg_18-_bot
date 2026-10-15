@@ -197,17 +197,21 @@ def category_menu(level: int, intensity: str, categories: list[str] | None = Non
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def card_actions(turn_id: int, has_timer: bool) -> InlineKeyboardMarkup:
+def card_actions(turn_id: int, has_timer: bool, *, is_penalty: bool = False) -> InlineKeyboardMarkup:
     rows = []
     if has_timer:
         rows.append([_button("⏱ Запустить таймер", f"game:timer:{turn_id}")])
-    rows.extend(
-        [
-            [_button("✅ Сделали", f"game:done:{turn_id}"), _button("🔄 Другую", f"game:replace:{turn_id}")],
-            [_button("🚫 Убрать карточку", f"game:revision:{turn_id}")],
-            [_button(HOME, "game:home"), _button("⏹ Закончить", "safe:end_game")],
-        ]
-    )
+    if is_penalty:
+        # A forfeit cannot be refused or swapped.
+        rows.append([_button("✅ Выполнено", f"game:done:{turn_id}")])
+    else:
+        rows.extend(
+            [
+                [_button("✅ Сделали", f"game:done:{turn_id}"), _button("🙅 Отказ → штраф", f"game:refuse:{turn_id}")],
+                [_button("🚫 Убрать карточку навсегда", f"game:revision:{turn_id}")],
+            ]
+        )
+    rows.append([_button(HOME, "game:home"), _button("⏹ Закончить", "safe:end_game")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

@@ -82,3 +82,49 @@ def test_replaced_card_stays_in_truth_or_dare_mode(tmp_path):
     first = service.draw_truth_or_dare(CHAT, None, 111, level=3, intensity="hard", category="task")
     second = service.replace_active_card(CHAT, None, 111)
     assert service.turn_play_mode(first.turn_id) == service.turn_play_mode(second.turn_id) == "tod:3:hard"
+
+
+# --- refusal costs a penalty --------------------------------------------------
+
+
+def test_random_draws_never_give_a_penalty(tmp_path):
+    db, config, service = _service(tmp_path)
+    service.ensure_session(CHAT, None)
+    players = [111, 222]
+    for i in range(60):
+        result = service.draw_card(CHAT, None, players[i % 2], level=None, category=None, source="roulette")
+        assert result.card.category != "penalty"
+        service.finish_turn(CHAT, None, players[i % 2])
+
+
+def test_refusing_a_card_gives_a_penalty_of_the_same_level(tmp_path):
+    db, config, service = _service(tmp_path)
+    service.ensure_session(CHAT, None)
+    dare = service.draw_truth_or_dare(CHAT, None, 111, level=2, intensity="light", category="task")
+    penalty = service.refuse_card(CHAT, None, 111, dare.turn_id)
+    assert penalty.card.category == "penalty" and penalty.card.level == 2
+    assert penalty.play_mode == "tod:2:light"
+    assert service.status(CHAT, None)["active_turn_id"] == penalty.turn_id
+    # The same player does the forfeit; refusing it is not allowed.
+    import pytest
+    from app.services.errors import GameError
+    with pytest.raises(GameError):
+        service.refuse_card(CHAT, None, 111, penalty.turn_id)
+
+
+def test_after_penalty_in_truth_or_dare_the_partner_chooses(tmp_path):
+    db, config, service = _service(tmp_path)
+    draw = FakeCallback("tod:draw:3:medium:question")
+    asyncio.run(game.cb_tod_draw(draw, config, service))
+    turn_id = service.status(CHAT, None)["active_turn_id"]
+    refuse = FakeCallback(f"game:refuse:{turn_id}", message=draw.message, bot=draw.bot)
+    asyncio.run(game.cb_refuse(refuse, config, service))
+    _, text, markup = refuse.bot.sent[-1]
+    assert "штраф" in text.lower()
+    datas = _datas(markup)
+    assert not any(d.startswith("game:refuse") for d in datas)
+    penalty_turn = service.status(CHAT, None)["active_turn_id"]
+    done = FakeCallback(f"game:done:{penalty_turn}", message=draw.message, bot=refuse.bot)
+    asyncio.run(game.cb_done(done, config, service))
+    _, text, markup = done.bot.sent[-1]
+    assert "Правда или действие" in text and "tod:draw:3:medium:task" in _datas(markup)

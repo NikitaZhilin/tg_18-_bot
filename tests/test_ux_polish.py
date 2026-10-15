@@ -46,7 +46,7 @@ def test_category_menu_shows_only_categories_with_cards():
 
 def test_card_buttons_are_bound_to_the_card():
     datas = _datas(card_actions(42, has_timer=True))
-    assert {"game:timer:42", "game:done:42", "game:replace:42", "game:revision:42"} <= set(datas)
+    assert {"game:timer:42", "game:done:42", "game:refuse:42", "game:revision:42"} <= set(datas)
 
 
 # --- fakes -----------------------------------------------------------------
