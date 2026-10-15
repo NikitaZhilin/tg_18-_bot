@@ -8,6 +8,15 @@ from typing import Iterable
 CATEGORIES = {"question", "task", "pose", "desire", "penalty"}
 INTENSITIES = {"light", "medium", "hard"}
 
+# «🍑 Анал» in the main menu: which risk tags each mode hides for the current game.
+ANAL_TAGS = frozenset({"anal", "anal_her", "anal_him"})
+ANAL_MODES = {
+    "both": frozenset(),
+    "her": frozenset({"anal_him"}),
+    "him": frozenset({"anal_her"}),
+    "off": frozenset({"anal"}),
+}
+
 FORBIDDEN_RISK_TAGS = {
     "minor_or_age_ambiguous",
     "non_consent",

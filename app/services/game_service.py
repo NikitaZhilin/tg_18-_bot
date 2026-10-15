@@ -715,6 +715,7 @@ class GameService(SessionSettingsMixin):
             "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
             "active_turn_id": session["active_turn_id"],
+            "anal_mode": self.anal_mode(chat_id, thread_id),
             "saved_desires": int(
                 self.db.fetchone(
                     "SELECT COUNT(*) AS count FROM saved_desires WHERE session_id = ? AND status = 'saved'",

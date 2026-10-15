@@ -11,17 +11,11 @@ CONTENT_FILES = (
     Path("content/restricted_cards.csv"),
 )
 
-CATEGORY_MARKERS = {
-    "question": ("Контекст:", "Ответьте:", "Итог:"),
-    "task": ("Порядок:", "Завершение:"),
-    "pose": (
-        "Исходное положение:",
-        "Действие:",
-        "Завершение:",
-    ),
-    "desire": ("Контекст:", "Сейчас:", "Использование:", "Завершение:"),
-    "penalty": ("Контекст:", "Выполнение:", "Завершение:"),
-}
+# Cards are plain text: no «Порядок:», «Контекст:» and other section labels.
+SECTION_LABEL = re.compile(
+    r"(?:^|\n\n)(Порядок|Завершение|Контекст|Ответьте|Итог|Исходное положение|Действие|"
+    r"Сейчас|Использование|Выполнение|Назначение)\s*:"
+)
 
 FORBIDDEN_PHRASES = (
     "из блока «контекст»",
@@ -115,15 +109,11 @@ def audit(rows: list[dict[str, str]]) -> dict[str, list[str]]:
         category = row["category"]
         lowered = text.casefold()
 
-        missing = [
-            marker
-            for marker in CATEGORY_MARKERS[category]
-            if text.count(marker) != 1
-        ]
-        if not row["title"].strip() or len(text) < 80 or missing:
+        labels = SECTION_LABEL.findall(text)
+        if not row["title"].strip() or len(text) < 80 or labels:
             failures["structure"].append(
                 f"{external_id}: title={bool(row['title'].strip())}, "
-                f"length={len(text)}, markers={missing}"
+                f"length={len(text)}, labels={labels}"
             )
 
         matches = [
@@ -149,7 +139,7 @@ def audit(rows: list[dict[str, str]]) -> dict[str, list[str]]:
             )
 
         if category == "pose":
-            action = section(text, "Действие:").casefold()
+            action = lowered
             action_activities = {
                 marker for marker in ACTIVITY_MARKERS if marker in action
             }

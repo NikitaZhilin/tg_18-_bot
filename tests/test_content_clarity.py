@@ -4,6 +4,8 @@ import csv
 import re
 from pathlib import Path
 
+from scripts.audit_card_content import SECTION_LABEL
+
 
 def _content_rows():
     rows = []
@@ -109,37 +111,21 @@ def test_extreme_cards_have_titles_and_actionable_structure():
     ) as source:
         rows = list(csv.DictReader(source))
 
-    required_markers = {
-        "question": ("контекст:", "ответьте:", "итог:"),
-        "task": ("порядок:", "завершение:"),
-        "pose": ("исходное положение:", "действие:", "завершение:"),
-        "desire": ("контекст:", "сейчас:", "использование:", "завершение:"),
-    }
     failures = []
     for row in rows:
-        text = row["text"].casefold()
-        missing = [marker for marker in required_markers[row["category"]] if marker not in text]
-        if not row["title"].strip() or missing:
-            failures.append((row["external_id"], row["title"], missing))
+        labels = SECTION_LABEL.findall(row["text"])
+        if not row["title"].strip() or labels:
+            failures.append((row["external_id"], row["title"], labels))
 
     assert failures == []
 
 
-def test_every_card_has_one_complete_category_specific_structure():
-    required_markers = {
-        "question": ("Контекст:", "Ответьте:", "Итог:"),
-        "task": ("Порядок:", "Завершение:"),
-        "pose": ("Исходное положение:", "Действие:", "Завершение:"),
-        "desire": ("Контекст:", "Сейчас:", "Использование:", "Завершение:"),
-        "penalty": ("Контекст:", "Выполнение:", "Завершение:"),
-    }
-    failures = []
-    for row in _content_rows():
-        text = row["text"]
-        for marker in required_markers[row["category"]]:
-            count = text.count(marker)
-            if count != 1:
-                failures.append((row["external_id"], marker, count))
+def test_cards_are_plain_text_without_section_labels():
+    failures = [
+        (row["external_id"], SECTION_LABEL.findall(row["text"]))
+        for row in _content_rows()
+        if SECTION_LABEL.findall(row["text"])
+    ]
     assert failures == []
 
 
@@ -338,15 +324,10 @@ def test_all_poses_and_desires_explain_the_complete_flow():
     failures = []
     for row in _content_rows():
         text = row["text"].casefold()
-        if row["category"] == "pose":
-            markers = ("исходное положение:", "действие:", "завершение:")
-        elif row["category"] == "desire":
-            markers = ("сейчас:", "использование:", "завершение:")
-        else:
-            continue
-        missing = [marker for marker in markers if marker not in text]
-        if missing:
-            failures.append((row["external_id"], missing))
+        # Pose: start position, action, finish. Desire: what it is, how to use it.
+        needed = {"pose": 3, "desire": 2}.get(row["category"])
+        if needed and len([p for p in text.split("\n\n") if p.strip()]) < needed:
+            failures.append((row["external_id"], "мало абзацев"))
     assert failures == []
 
 
