@@ -82,6 +82,8 @@ POSE_FAMILY_NAMES = {
     "endurance": "на выдержку",
     "control_seated": "контроль темпа сидя",
     "control_wall": "контроль темпа у стены",
+    "rear": "сзади",
+    "oral": "оральная",
 }
 
 RISK_TAG_NAMES = {

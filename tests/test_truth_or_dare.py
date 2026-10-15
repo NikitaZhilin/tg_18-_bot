@@ -69,11 +69,11 @@ def test_truth_falls_back_to_other_intensity_when_questions_run_out(tmp_path):
     service.ensure_session(CHAT, None)
     players = [111, 222]
     seen = []
-    for i in range(12):
+    for i in range(20):
         result = service.draw_truth_or_dare(CHAT, None, players[i % 2], level=3, intensity="light", category="question")
         seen.append(result.card.intensity)
         service.finish_turn(CHAT, None, players[i % 2])
-    assert seen.count("light") == 8 and len(set(seen)) > 1
+    assert seen.count("light") == 15 and len(set(seen)) > 1
 
 
 def test_replaced_card_stays_in_truth_or_dare_mode(tmp_path):
