@@ -58,6 +58,7 @@ def _setup(tmp_path, unlocked=True, joined=(HUSBAND, WIFE)):
 
 def _press(data, user, config, service, bot, handler):
     callback = FakeCallback(data, user_id=user, message=_group_message(user), bot=bot)
+    callback.from_user = SimpleNamespace(id=user, first_name={HUSBAND: "Никита", WIFE: "Аня"}.get(user, "Гость"), username=None)
     asyncio.run(handler(callback, config, service))
     return callback
 

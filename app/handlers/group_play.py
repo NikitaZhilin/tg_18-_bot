@@ -109,7 +109,7 @@ async def cb_join(callback: CallbackQuery, config: Config, game_service: GameSer
         return
     need = game_service.players_needed()
     user = callback.from_user
-    name = user.first_name or user.username or "Игрок"
+    name = getattr(user, "first_name", None) or getattr(user, "username", None) or "Игрок"
     if not game_service.groups.join(chat.id, user.id, name, need):
         await answer_callback(callback, "Все места уже заняты.", show_alert=True)
         return
