@@ -21,7 +21,7 @@ class ThreesomeState:
 
     @property
     def active(self) -> bool:
-        return self.enabled and self.third_id is not None
+        return self.enabled
 
 
 class ThreesomeSettings:

@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.config import Config
+from app.handlers import group_play
 from app.handlers.common import message_thread_id, reject_if_not_allowed
 from app.handlers.screens import home
 from app.keyboards.game import consent_menu
@@ -50,6 +51,9 @@ async def cmd_start(
     game_service: GameService,
     state: FSMContext,
 ) -> None:
+    if message.chat.type in ("group", "supergroup"):
+        await group_play.start_in_group(message, config, game_service)
+        return
     if await reject_if_not_allowed(message, config):
         return
     if await state.get_state() is not None:

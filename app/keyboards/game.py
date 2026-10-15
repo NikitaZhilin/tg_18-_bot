@@ -81,7 +81,7 @@ def main_menu(
 
 def main_menu_for_status(status: Mapping[str, object], *, show_admin: bool = False) -> InlineKeyboardMarkup:
     if not status.get("active"):
-        return main_menu(show_admin=show_admin)
+        return main_menu(show_admin=show_admin, restricted_enabled=True)
     return main_menu(
         has_active_turn=bool(status.get("has_active_turn")),
         restricted_enabled=bool(status.get("restricted_content")),

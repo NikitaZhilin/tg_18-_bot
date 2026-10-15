@@ -29,6 +29,12 @@ class SafetyService:
         reason: str,
     ) -> bool:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
+        if chat_id < 0:
+            # A new game in a group starts with «🙋 Я играю» again.
+            try:
+                self.db.execute("DELETE FROM group_players WHERE telegram_chat_id = ?", (chat_id,))
+            except Exception:
+                pass
         with self.db.transaction() as conn:
             session = self.sessions.get_active(chat_key, conn)
             if not session:

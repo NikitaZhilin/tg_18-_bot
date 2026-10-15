@@ -10,6 +10,7 @@ from app.domain import PickFilter, PickedCard
 from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, LEVEL_NAMES
 from app.services.card_picker import CardPicker, NoCardsAvailable
 from app.services.errors import GameError
+from app.services.group_access import GroupAccess
 from app.services.threesome import ThreesomeSettings
 from app.services.session_settings import SessionSettingsMixin
 from app.storage import Database
@@ -37,6 +38,7 @@ class GameService(SessionSettingsMixin):
         self.cards = CardRepository(db)
         self.card_picker = CardPicker(db)
         self.threesome = ThreesomeSettings(db)
+        self.groups = GroupAccess(db)
 
     def _consent_date(self) -> str:
         return datetime.now(ZoneInfo(self.config.bot_timezone)).date().isoformat()
@@ -57,10 +59,19 @@ class GameService(SessionSettingsMixin):
                     True,
                 )
 
-    def _player_label(self, slot: str) -> str:
+    def _player_label(self, slot: str, session=None) -> str:
+        if session is not None and str(session["chat_key"]).startswith("-"):
+            chat_id = int(str(session["chat_key"]).split(":")[0])
+            user_id = session[f"{slot}_id"] if slot in ("player_1", "player_2", "player_3") else None
+            name = self.groups.name_of(chat_id, int(user_id)) if user_id is not None else None
+            if name:
+                return name
         if slot == "player_3":
-            return self.threesome.state().third_name
+            return "Гостья"
         return self.config.player_2_name if slot == "player_2" else self.config.player_1_name
+
+    def players_needed(self) -> int:
+        return 3 if self.threesome.state().enabled else 2
 
     @staticmethod
     def _next_slot(session) -> str:
@@ -88,10 +99,11 @@ class GameService(SessionSettingsMixin):
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         self.sessions.ensure_chat_context(chat_key, chat_id, thread_id, title)
         active = self.sessions.get_active(chat_key)
-        three = self.threesome.state() if chat_id < 0 else None
-        wants_third = bool(three and three.active)
-        if active and _has_third(active) != wants_third:
-            # The admin switched «игра на троих» on or off: start this group's game anew.
+        roster = self.groups.roster(chat_id) if chat_id < 0 else []
+        wanted = [uid for uid, _ in roster][: self.players_needed()] if len(roster) >= 2 else None
+        wants_third = bool(wanted and len(wanted) == 3)
+        if active and wanted and _session_players(active) != wanted:
+            # Players or «игра на троих» changed: start this group's game anew.
             self.db.execute(
                 "UPDATE sessions SET status = 'completed', stop_reason = 'mode_changed', "
                 "stopped_at = CURRENT_TIMESTAMP, active_turn_id = NULL WHERE id = ?",
@@ -101,11 +113,15 @@ class GameService(SessionSettingsMixin):
         if active:
             self._restore_daily_consents(active)
             return active
-        player_1_id, player_2_id = self._players_for_chat(chat_id)
         player_3_id = None
-        if wants_third:
-            player_3_id = three.third_id
-            self.users.upsert_user(player_3_id, three.third_name, "player_3")
+        if wanted:
+            for index, (uid, name) in enumerate(roster[: len(wanted)]):
+                self.users.upsert_user(uid, name, f"player_{index + 1}")
+            player_1_id, player_2_id = wanted[0], wanted[1]
+            if wants_third:
+                player_3_id = wanted[2]
+        else:
+            player_1_id, player_2_id = self._players_for_chat(chat_id)
         session_id = self.sessions.create(
             chat_key,
             player_1_id,
@@ -215,7 +231,7 @@ class GameService(SessionSettingsMixin):
             ):
                 raise GameError(BASE_CONSENT_REQUIRED)
             if int(session["current_player_id"]) != int(user_id):
-                raise GameError(f"Сейчас очередь: {self._player_label(session['current_player_slot'])}")
+                raise GameError(f"Сейчас очередь: {self._player_label(session['current_player_slot'], session)}")
             if session["active_turn_id"]:
                 raise GameError("Сначала завершите текущую карточку или откройте ее кнопкой «Продолжить карточку»")
             if source == "penalty" and not bool(session["allow_penalties"]):
@@ -223,8 +239,6 @@ class GameService(SessionSettingsMixin):
             if source == "penalty":
                 category = "penalty"
             if collection_code == "restricted_content":
-                if not bool(session["allow_restricted_content"]):
-                    raise GameError("Сначала откройте доступ к разделу «Экстрим» в админке")
                 level = None
                 intensity = None
 
@@ -250,7 +264,7 @@ class GameService(SessionSettingsMixin):
                     category=category,
                     intensity=intensity,
                     collection_code=collection_code,
-                    allow_restricted_content=bool(session["allow_restricted_content"]),
+                    allow_restricted_content=collection_code == "restricted_content",
                     threesome=_has_third(session),
                 ),
                 conn,
@@ -386,7 +400,7 @@ class GameService(SessionSettingsMixin):
                         category=category,
                         intensity=intensity,
                         collection_code=collection_code,
-                        allow_restricted_content=bool(session["allow_restricted_content"]),
+                        allow_restricted_content=collection_code == "restricted_content",
                         threesome=_has_third(session),
                     ),
                     conn,
@@ -689,7 +703,7 @@ class GameService(SessionSettingsMixin):
                 """,
                 (next_player, next_slot, session["id"]),
             )
-        return self._player_label(next_slot)
+        return self._player_label(next_slot, session)
 
     def unlock_restricted_content(self, chat_id: int, thread_id: int | None) -> None:
         session = self.active_session(chat_id, thread_id)
@@ -750,10 +764,10 @@ class GameService(SessionSettingsMixin):
             "session_id": session["id"],
             "current_player_id": session["current_player_id"],
             "current_player_slot": session["current_player_slot"],
-            "current_player_label": self._player_label(session["current_player_slot"]),
+            "current_player_label": self._player_label(session["current_player_slot"], session),
             "used_cards": used,
             "active_timer": timer["deadline_at"] if timer else None,
-            "restricted_content": bool(session["allow_restricted_content"]),
+            "restricted_content": not _has_third(session),  # «Экстрим» is always open for two
             "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
             "active_turn_id": session["active_turn_id"],
@@ -830,3 +844,10 @@ def _has_third(session) -> bool:
         return session["player_3_id"] is not None
     except (IndexError, KeyError):
         return False
+
+
+def _session_players(session) -> list[int]:
+    players = [int(session["player_1_id"]), int(session["player_2_id"])]
+    if _has_third(session):
+        players.append(int(session["player_3_id"]))
+    return players

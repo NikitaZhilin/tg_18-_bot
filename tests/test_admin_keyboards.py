@@ -42,11 +42,10 @@ def test_review_keyboard_can_accept_edit_or_mark_card():
     assert "admin:home" in callbacks
 
 
-def test_restricted_button_shows_current_state():
-    off_texts = [button.text for row in admin_menu(restricted_enabled=False).inline_keyboard for button in row]
-    on_texts = [button.text for row in admin_menu(restricted_enabled=True).inline_keyboard for button in row]
-    assert "Экстрим: доступ закрыт" in off_texts
-    assert "Экстрим: доступ открыт" in on_texts
+def test_admin_menu_has_group_password_and_no_extreme_lock():
+    callbacks = _callbacks(admin_menu())
+    assert "grp:password" in callbacks and "three:menu" in callbacks
+    assert "admin:restricted" not in callbacks
 
 
 def test_game_keyboards_have_main_menu_and_dynamic_modes():

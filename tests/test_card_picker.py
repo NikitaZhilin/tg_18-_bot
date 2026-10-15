@@ -167,7 +167,7 @@ def test_finishing_turn_is_idempotent_and_restricted_to_current_player(tmp_path)
     db.close()
 
 
-def test_restricted_cards_require_session_unlock(tmp_path):
+def test_extreme_cards_are_always_available(tmp_path):
     db = migrated_db(tmp_path)
     import_restricted_seed(db)
     service = GameService(db, make_config(tmp_path))
@@ -175,17 +175,6 @@ def test_restricted_cards_require_session_unlock(tmp_path):
     service.accept_base_consent(10, None, 111)
     service.accept_base_consent(10, None, 222)
 
-    with pytest.raises(GameError, match="Экстрим"):
-        service.draw_card(
-            10,
-            None,
-            111,
-            level=None,
-            category=None,
-            collection_code="restricted_content",
-        )
-
-    service.unlock_restricted_content(10, None)
     result = service.draw_card(
         10,
         None,
