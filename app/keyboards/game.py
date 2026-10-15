@@ -61,6 +61,7 @@ def main_menu(
     show_admin: bool = False,
     saved_desires: int = 0,
     anal_mode: str = "both",
+    extreme_switch: bool = True,
 ) -> InlineKeyboardMarkup:
     rows = []
     if has_active_turn:
@@ -69,8 +70,9 @@ def main_menu(
     rows.append([_button("🃏 Выбрать уровень", "game:menu")])
     rows.append([_button("🎭 Правда или действие", "tod:menu")])
     rows.append([_button(f"🍑 Анал: {ANAL_SHORT.get(anal_mode, ANAL_SHORT['both'])}", "anal:menu")])
-    if restricted_enabled:
-        rows.append([_button("🔞 Экстрим", "game:extreme")])
+    if extreme_switch:
+        switch = _button("🔞 Экстрим: ✅ вкл" if restricted_enabled else "🔞 Экстрим: 🚫 выкл", "game:extreme_toggle")
+        rows.append([switch, _button("🔞 Экстрим", "game:extreme")] if restricted_enabled else [switch])
     desires_text = f"🎁 Желания ({saved_desires})" if saved_desires else "🎁 Желания"
     rows.append([_button(desires_text, "game:desires:0"), _button(SETTINGS_BUTTON, "game:settings")])
     if show_admin:
@@ -89,6 +91,7 @@ def main_menu_for_status(status: Mapping[str, object], *, show_admin: bool = Fal
         show_admin=show_admin,
         saved_desires=int(status.get("saved_desires") or 0),
         anal_mode=str(status.get("anal_mode") or "both"),
+        extreme_switch=bool(status.get("extreme_switch", True)),
     )
 
 

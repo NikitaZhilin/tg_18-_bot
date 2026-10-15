@@ -239,6 +239,8 @@ class GameService(SessionSettingsMixin):
             if source == "penalty":
                 category = "penalty"
             if collection_code == "restricted_content":
+                if not bool(session["allow_restricted_content"]) or _has_third(session):
+                    raise GameError("«🔞 Экстрим» выключен — включите его в главном меню.")
                 level = None
                 intensity = None
 
@@ -264,7 +266,7 @@ class GameService(SessionSettingsMixin):
                     category=category,
                     intensity=intensity,
                     collection_code=collection_code,
-                    allow_restricted_content=collection_code == "restricted_content",
+                    allow_restricted_content=bool(session["allow_restricted_content"]),
                     threesome=_has_third(session),
                 ),
                 conn,
@@ -400,7 +402,7 @@ class GameService(SessionSettingsMixin):
                         category=category,
                         intensity=intensity,
                         collection_code=collection_code,
-                        allow_restricted_content=collection_code == "restricted_content",
+                        allow_restricted_content=bool(session["allow_restricted_content"]),
                         threesome=_has_third(session),
                     ),
                     conn,
@@ -705,6 +707,15 @@ class GameService(SessionSettingsMixin):
             )
         return self._player_label(next_slot, session)
 
+    def toggle_extreme(self, chat_id: int, thread_id: int | None) -> bool:
+        """«🔞 Экстрим» on/off for the current game. On: its cards can come up anywhere."""
+        session = self.active_session(chat_id, thread_id)
+        if not session:
+            raise GameError("Нет активной сессии")
+        enabled = not bool(session["allow_restricted_content"])
+        self.sessions.set_restricted_content(int(session["id"]), enabled)
+        return enabled
+
     def unlock_restricted_content(self, chat_id: int, thread_id: int | None) -> None:
         session = self.active_session(chat_id, thread_id)
         if not session:
@@ -767,7 +778,8 @@ class GameService(SessionSettingsMixin):
             "current_player_label": self._player_label(session["current_player_slot"], session),
             "used_cards": used,
             "active_timer": timer["deadline_at"] if timer else None,
-            "restricted_content": not _has_third(session),  # «Экстрим» is always open for two
+            "restricted_content": bool(session["allow_restricted_content"]) and not _has_third(session),
+            "extreme_switch": not _has_third(session),
             "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
             "active_turn_id": session["active_turn_id"],

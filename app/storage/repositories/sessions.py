@@ -54,9 +54,9 @@ class SessionRepository:
                 """
                 INSERT INTO sessions (
                     chat_key, player_1_id, player_2_id, current_player_id,
-                    current_player_slot, updated_at
+                    current_player_slot, allow_restricted_content, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
                 """,
                 (chat_key, player_1_id, player_2_id, current_player_id, current_player_slot),
             )
