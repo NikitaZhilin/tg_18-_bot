@@ -49,7 +49,7 @@ async def reject_if_not_allowed(message: Message, config: Config) -> bool:
     if not user or not config.is_allowed(user.id):
         await message.answer("Доступ закрыт")
         return True
-    if await group_has_strangers(message.bot, message.chat):
+    if await group_has_strangers(getattr(message, "bot", None), getattr(message, "chat", None)):
         await message.answer(GROUP_TOO_BIG_TEXT)
         return True
     return False
@@ -61,7 +61,7 @@ async def reject_callback_if_not_allowed(callback: CallbackQuery, config: Config
         await answer_callback(callback, "Доступ закрыт", show_alert=True)
         return True
     chat = getattr(callback.message, "chat", None)
-    if await group_has_strangers(callback.bot, chat):
+    if await group_has_strangers(getattr(callback, "bot", None), chat):
         await answer_callback(callback, GROUP_TOO_BIG_TEXT, show_alert=True)
         return True
     return False
