@@ -23,13 +23,15 @@ from app.handlers import (
     feedback,
     game,
     game_settings,
+    group_play,
     membership,
     safety,
     start,
     status,
 )
 from app.logging_config import configure_logging
-from app.services import threesome
+from app.services import group_access, threesome
+from app.services.group_access import GroupAccess
 from app.services.threesome import ThreesomeSettings
 from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
@@ -82,9 +84,11 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     assert isinstance(db, Database)
     dp = Dispatcher(storage=SQLiteFSMStorage(db), **services)
     threesome.registry = ThreesomeSettings(db)
+    group_access.registry = GroupAccess(db)
     dp.errors.register(errors.on_error)
     dp.include_router(membership.router)
     dp.include_router(admin_threesome.router)
+    dp.include_router(group_play.router)
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)

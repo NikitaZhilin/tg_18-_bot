@@ -1,160 +1,149 @@
-"""Playing in a shared Telegram group: two accounts, one game, strict turns."""
+"""Playing in a group: password, «🙋 Я играю», strict turns. Private chats unchanged."""
 from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
 
-from app.handlers import game
+import pytest
+
+from app.handlers import common, game, group_play, membership
+from app.services import group_access
 from app.services.game_service import GameService
 from tests.helpers import import_seed, make_config, migrated_db
 from tests.test_ux_polish import FakeBot, FakeCallback, FakeMessage
 
 GROUP = -1009876543210
-HUSBAND, WIFE, STRANGER = 111, 222, 999
+HUSBAND, WIFE, STRANGER = 555, 666, 999
 
 
-def _group_message():
-    message = FakeMessage()
+@pytest.fixture(autouse=True)
+def _reset_registry():
+    yield
+    group_access.registry = None
+
+
+def _group_message(user_id=HUSBAND, text="", reply_to=None):
+    message = FakeMessage(text)
     message.chat = SimpleNamespace(id=GROUP, title="Мы", type="supergroup")
+    message.from_user = SimpleNamespace(id=user_id, first_name={HUSBAND: "Никита", WIFE: "Аня"}.get(user_id, "Гость"), username=None)
+    message.reply_to_message = reply_to
+    message.answers = []
+    message.deleted = False
+
+    async def answer(text, reply_markup=None, **kwargs):
+        message.answers.append((text, reply_markup))
+
+    async def delete():
+        message.deleted = True
+
+    message.answer = answer
+    message.delete = delete
+    message.bot = FakeBot()
     return message
 
 
-def _setup(tmp_path):
+def _setup(tmp_path, unlocked=True, joined=(HUSBAND, WIFE)):
     db = migrated_db(tmp_path)
     import_seed(db)
     config = make_config(tmp_path)
     service = GameService(db, config)
-    bot = FakeBot()
-    return db, config, service, bot
+    group_access.registry = service.groups
+    service.groups.set_password("04101996", 111)
+    if unlocked:
+        service.groups.unlock(GROUP, HUSBAND)
+    for uid in joined:
+        service.groups.join(GROUP, uid, {HUSBAND: "Никита", WIFE: "Аня"}[uid], 2)
+    return db, config, service, FakeBot()
 
 
 def _press(data, user, config, service, bot, handler):
-    callback = FakeCallback(data, user_id=user, message=_group_message(), bot=bot)
+    callback = FakeCallback(data, user_id=user, message=_group_message(user), bot=bot)
+    callback.from_user = SimpleNamespace(id=user, first_name={HUSBAND: "Никита", WIFE: "Аня"}.get(user, "Гость"), username=None)
     asyncio.run(handler(callback, config, service))
     return callback
 
 
-def test_group_game_has_two_different_players(tmp_path):
-    db, config, service, bot = _setup(tmp_path)
-    session = service.ensure_session(GROUP, None, "Мы")
-    assert {int(session["player_1_id"]), int(session["player_2_id"])} == {HUSBAND, WIFE}
+def test_locked_group_asks_for_the_password_and_opens_with_it(tmp_path):
+    db, config, service, bot = _setup(tmp_path, unlocked=False, joined=())
+    start = _group_message()
+    asyncio.run(group_play.start_in_group(start, config, service))
+    assert start.answers[0][0].startswith("🔒 Эта группа закрыта")
+
+    prompt = SimpleNamespace(text=start.answers[0][0], from_user=SimpleNamespace(is_bot=True))
+    wrong = _group_message(text="1234", reply_to=prompt)
+    asyncio.run(group_play.msg_password(wrong, config, service))
+    assert not service.groups.is_unlocked(GROUP) and wrong.deleted
+
+    right = _group_message(text="04101996", reply_to=prompt)
+    asyncio.run(group_play.msg_password(right, config, service))
+    assert service.groups.is_unlocked(GROUP) and right.deleted
+    assert "Я играю" in right.answers[0][0]
 
 
-def test_turns_alternate_between_two_accounts_in_a_group(tmp_path):
+def test_password_is_not_stored_in_plain_text(tmp_path):
     db, config, service, bot = _setup(tmp_path)
-    first = _press("game:roulette", HUSBAND, config, service, bot, game.cb_roulette)
+    stored = db.fetchone("SELECT value FROM bot_settings WHERE key = 'group_password'")["value"]
+    assert "04101996" not in stored and stored.startswith("pbkdf2$")
+
+
+def test_nothing_works_in_a_locked_group(tmp_path):
+    db, config, service, bot = _setup(tmp_path, unlocked=False, joined=())
+    callback = _press("game:roulette", HUSBAND, config, service, bot, game.cb_roulette)
+    assert callback.answers[0][0] == common.GROUP_LOCKED_TEXT
+
+
+def test_players_join_and_get_their_names(tmp_path):
+    db, config, service, bot = _setup(tmp_path, joined=())
+    _press("grp:join", HUSBAND, config, service, bot, group_play.cb_join)
+    assert service.active_session(GROUP, None) is None  # waiting for the second
+    _press("grp:join", WIFE, config, service, bot, group_play.cb_join)
+    status = service.status(GROUP, None)
+    assert status["active"] and status["current_player_label"] == "Никита"
+    full = _press("grp:join", STRANGER, config, service, bot, group_play.cb_join)
+    assert any("заняты" in (text or "") for text, _ in full.answers)
+
+
+def test_turns_alternate_between_two_phones(tmp_path):
+    db, config, service, bot = _setup(tmp_path)
+    service.ensure_session(GROUP, None)
+    _press("game:roulette", HUSBAND, config, service, bot, game.cb_roulette)
     turn_id = service.status(GROUP, None)["active_turn_id"]
-    assert turn_id and not any(alert for _, alert in first.answers)
-
-    # The wife cannot draw or close the husband's card.
     blocked = _press("game:roulette", WIFE, config, service, bot, game.cb_roulette)
     assert any(alert for _, alert in blocked.answers)
-    blocked_done = _press(f"game:done:{turn_id}", WIFE, config, service, bot, game.cb_done)
-    assert any(alert for _, alert in blocked_done.answers)
-    assert service.status(GROUP, None)["active_turn_id"] == turn_id
-
     _press(f"game:done:{turn_id}", HUSBAND, config, service, bot, game.cb_done)
     assert int(service.status(GROUP, None)["current_player_id"]) == WIFE
-    hers = _press("game:roulette", WIFE, config, service, bot, game.cb_roulette)
-    assert not any(alert for _, alert in hers.answers)
+    assert bot.sent[-1][1].startswith("✅ Готово! Теперь очередь: Аня")
 
 
-def test_stranger_in_the_group_cannot_press_anything(tmp_path):
+def test_someone_not_in_the_game_cannot_press(tmp_path):
     db, config, service, bot = _setup(tmp_path)
     callback = _press("game:roulette", STRANGER, config, service, bot, game.cb_roulette)
-    assert callback.answers == [("Доступ закрыт", True)]
-    assert service.active_session(GROUP, None) is None
+    assert callback.answers[0][0] == common.NOT_IN_GAME_TEXT
 
 
-def test_group_game_is_separate_from_the_private_one(tmp_path):
+def test_private_chat_is_one_phone_for_both(tmp_path):
     db, config, service, bot = _setup(tmp_path)
-    service.ensure_session(HUSBAND, None)
-    service.set_anal_mode(HUSBAND, None, "off")
-    service.ensure_session(GROUP, None, "Мы")
-    assert service.anal_mode(GROUP, None) == "both"
-    assert service.active_session(GROUP, None)["id"] != service.active_session(HUSBAND, None)["id"]
+    session = service.ensure_session(111, None)
+    assert int(session["player_1_id"]) == int(session["player_2_id"]) == 111
 
 
-def test_truth_or_dare_in_a_group_passes_the_choice_to_the_wife(tmp_path):
+def test_ending_the_group_game_frees_the_seats(tmp_path):
+    from app.services.safety_service import SafetyService
+
     db, config, service, bot = _setup(tmp_path)
-    _press("tod:draw:2:light:task", HUSBAND, config, service, bot, game.cb_tod_draw)
-    turn_id = service.status(GROUP, None)["active_turn_id"]
-    _press(f"game:done:{turn_id}", HUSBAND, config, service, bot, game.cb_done)
-    chat_id, text, _ = bot.sent[-1]
-    assert chat_id == GROUP and "Ходит: B" in text
+    service.ensure_session(GROUP, None)
+    SafetyService(db).end_game(GROUP, None, HUSBAND)
+    assert service.groups.roster(GROUP) == []
 
 
-# --- private chat stays a one-phone game; group guards ----------------------
-
-
-def test_private_chat_is_one_phone_for_both_even_with_two_accounts(tmp_path):
-    db, config, service, bot = _setup(tmp_path)
-    session = service.ensure_session(HUSBAND, None)
-    assert int(session["player_1_id"]) == int(session["player_2_id"]) == HUSBAND
-    first = service.draw_card(HUSBAND, None, HUSBAND, level=1, category="task")
-    assert service.finish_turn(HUSBAND, None, HUSBAND) == "B"
-    service.draw_card(HUSBAND, None, HUSBAND, level=1, category="task")  # the «second player» on the same phone
-    assert first.turn_id
-
-
-def test_wife_has_her_own_one_phone_game_in_her_private_chat(tmp_path):
-    db, config, service, bot = _setup(tmp_path)
-    session = service.ensure_session(WIFE, None)
-    assert int(session["player_1_id"]) == int(session["player_2_id"]) == WIFE
-
-
-def test_group_needs_two_accounts(tmp_path):
-    import pytest
-    from dataclasses import replace
-
-    from app.services.errors import GameError
-
-    db = migrated_db(tmp_path)
-    config = replace(make_config(tmp_path), allowed_user_ids={HUSBAND}, admin_user_ids={HUSBAND}, single_account_two_players=True)
-    service = GameService(db, config)
-    assert service.ensure_session(HUSBAND, None)  # private chat still works
-    session = service.ensure_session(GROUP, None)
-    assert int(session["player_1_id"]) == HUSBAND  # alone in a group: same as private
-
-
-class CrowdedBot(FakeBot):
-    def __init__(self, members):
-        super().__init__()
-        self.members = members
-        self.left = []
-
-    async def get_chat_member_count(self, chat_id):
-        return self.members
-
-    async def leave_chat(self, chat_id):
-        self.left.append(chat_id)
-
-
-def test_no_cards_in_a_group_with_a_third_person(tmp_path):
-    db, config, service, _ = _setup(tmp_path)
-    bot = CrowdedBot(members=4)
-    callback = _press("game:roulette", HUSBAND, config, service, bot, game.cb_roulette)
-    assert callback.answers and "кроме вас двоих" in callback.answers[0][0]
-    assert service.active_session(GROUP, None) is None
-
-
-def test_bot_leaves_a_group_added_by_a_stranger_and_greets_partners(tmp_path):
-    from app.handlers import membership
-
+def test_bot_greets_whoever_adds_it(tmp_path):
     config = make_config(tmp_path)
-
-    def event(by, bot):
-        return SimpleNamespace(
-            chat=SimpleNamespace(id=GROUP, type="supergroup"),
-            new_chat_member=SimpleNamespace(status="member"),
-            from_user=SimpleNamespace(id=by),
-            bot=bot,
-        )
-
-    stranger_bot = CrowdedBot(members=3)
-    asyncio.run(membership.on_bot_membership(event(STRANGER, stranger_bot), config))
-    assert stranger_bot.left == [GROUP] and stranger_bot.sent == []
-
-    our_bot = CrowdedBot(members=3)
-    asyncio.run(membership.on_bot_membership(event(HUSBAND, our_bot), config))
-    assert our_bot.left == [] and "/start" in our_bot.sent[0][1]
+    bot = FakeBot()
+    event = SimpleNamespace(
+        chat=SimpleNamespace(id=GROUP, type="supergroup"),
+        new_chat_member=SimpleNamespace(status="member"),
+        from_user=SimpleNamespace(id=STRANGER),
+        bot=bot,
+    )
+    asyncio.run(membership.on_bot_membership(event, config))
+    assert "пароль" in bot.sent[0][1]
