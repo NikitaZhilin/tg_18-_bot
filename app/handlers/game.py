@@ -72,6 +72,10 @@ async def _send_home(callback: CallbackQuery, config: Config, game_service: Game
     )
 
 
+def _threesome(game_service: GameService, callback: CallbackQuery) -> bool:
+    return bool(game_service.status(*_where(callback)).get("threesome"))
+
+
 def _level_menu(game_service: GameService, chat_id: int, thread_id: int | None):
     status = game_service.status(chat_id, thread_id)
     return level_menu(restricted_enabled=bool(status.get("restricted_content", False)))
@@ -228,7 +232,7 @@ async def cb_level(callback: CallbackQuery, config: Config, game_service: GameSe
     if level >= 3:
         await show_screen(callback, intensity_menu_text(level), intensity_menu(level))
     else:
-        categories = game_service.categories_with_cards(level, "light")
+        categories = game_service.categories_with_cards(level, "light", _threesome(game_service, callback))
         await show_screen(
             callback,
             category_menu_text(level, "light", categories),
@@ -242,7 +246,7 @@ async def cb_intensity(callback: CallbackQuery, config: Config, game_service: Ga
     if await reject_callback_if_not_allowed(callback, config):
         return
     _, _, level, intensity = callback.data.split(":")
-    categories = game_service.categories_with_cards(int(level), intensity)
+    categories = game_service.categories_with_cards(int(level), intensity, _threesome(game_service, callback))
     await show_screen(
         callback,
         category_menu_text(int(level), intensity, categories),

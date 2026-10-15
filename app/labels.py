@@ -122,6 +122,7 @@ COLLECTION_NAMES = {
     "base_tasks": "Основные карточки",
     "kamasutra_inspired_poses": "Позы",
     "restricted_content": "Экстрим",
+    "threesome": "На троих",
 }
 
 

@@ -69,6 +69,15 @@ class CardPicker:
                 """
             )
             params.append(filters.collection_code)
+        # Cards for three are a separate deck: only in a threesome game, and only them there.
+        if filters.threesome:
+            where.append(
+                "EXISTS (SELECT 1 FROM card_collection_items t WHERE t.card_id = c.id AND t.collection_code = 'threesome')"
+            )
+        else:
+            where.append(
+                "NOT EXISTS (SELECT 1 FROM card_collection_items t WHERE t.card_id = c.id AND t.collection_code = 'threesome')"
+            )
         if not filters.allow_restricted_content:
             where.append(
                 """

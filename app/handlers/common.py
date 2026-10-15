@@ -4,6 +4,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
 from app.config import Config
+from app.services import threesome
 
 
 async def answer_callback(callback: CallbackQuery, *args, **kwargs) -> None:
@@ -34,6 +35,20 @@ GROUP_TOO_BIG_TEXT = (
 )
 
 
+def max_group_members() -> int:
+    registry = threesome.registry
+    if registry is not None and registry.state().active:
+        return MAX_GROUP_MEMBERS + 1  # the third player as well
+    return MAX_GROUP_MEMBERS
+
+
+def is_player(user_id: int, config: Config, chat) -> bool:
+    if config.is_allowed(user_id):
+        return True
+    registry = threesome.registry
+    return registry is not None and registry.is_guest(user_id, chat)
+
+
 async def group_has_strangers(bot, chat) -> bool:
     if chat is None or getattr(chat, "type", None) not in ("group", "supergroup"):
         return False
@@ -41,12 +56,12 @@ async def group_has_strangers(bot, chat) -> bool:
         count = await bot.get_chat_member_count(chat.id)
     except Exception:
         return False  # Telegram did not answer: do not block the game over it
-    return count > MAX_GROUP_MEMBERS
+    return count > max_group_members()
 
 
 async def reject_if_not_allowed(message: Message, config: Config) -> bool:
     user = message.from_user
-    if not user or not config.is_allowed(user.id):
+    if not user or not is_player(user.id, config, getattr(message, "chat", None)):
         await message.answer("Доступ закрыт")
         return True
     if await group_has_strangers(getattr(message, "bot", None), getattr(message, "chat", None)):
@@ -57,10 +72,10 @@ async def reject_if_not_allowed(message: Message, config: Config) -> bool:
 
 async def reject_callback_if_not_allowed(callback: CallbackQuery, config: Config) -> bool:
     user = callback.from_user
-    if not user or not config.is_allowed(user.id):
+    chat = getattr(callback.message, "chat", None)
+    if not user or not is_player(user.id, config, chat):
         await answer_callback(callback, "Доступ закрыт", show_alert=True)
         return True
-    chat = getattr(callback.message, "chat", None)
     if await group_has_strangers(getattr(callback, "bot", None), chat):
         await answer_callback(callback, GROUP_TOO_BIG_TEXT, show_alert=True)
         return True

@@ -16,6 +16,7 @@ from app.handlers import (
     admin_cards,
     admin_items,
     admin_operations,
+    admin_threesome,
     desires,
     errors,
     fallback,
@@ -28,6 +29,8 @@ from app.handlers import (
     status,
 )
 from app.logging_config import configure_logging
+from app.services import threesome
+from app.services.threesome import ThreesomeSettings
 from app.services.admin_service import AdminService
 from app.services.content_importer import ContentImporter
 from app.services.desire_service import DesireService
@@ -78,8 +81,10 @@ def build_dispatcher(services: dict[str, object]) -> Dispatcher:
     db = services["db"]
     assert isinstance(db, Database)
     dp = Dispatcher(storage=SQLiteFSMStorage(db), **services)
+    threesome.registry = ThreesomeSettings(db)
     dp.errors.register(errors.on_error)
     dp.include_router(membership.router)
+    dp.include_router(admin_threesome.router)
     dp.include_router(safety.router)
     dp.include_router(start.router)
     dp.include_router(status.router)

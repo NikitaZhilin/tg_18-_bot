@@ -30,6 +30,7 @@ def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarku
             [InlineKeyboardButton(text="Конфликты обновлений", callback_data="admin:conflicts")],
             [InlineKeyboardButton(text="Импорт XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Экспорт XLSX", callback_data="admin:export")],
+            [InlineKeyboardButton(text="👥 Игра на троих", callback_data="three:menu")],
             [
                 InlineKeyboardButton(
                     text=restricted_text,
