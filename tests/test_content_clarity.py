@@ -82,7 +82,7 @@ def test_extreme_sheet_content_is_consistently_gated():
         newline="",
     ) as source:
         rows = list(csv.DictReader(source))
-    assert len(rows) == 38
+    assert len(rows) == 45
     for row in rows:
         assert row["level"] == "4"
         assert row["intensity"] == "hard"
@@ -91,7 +91,7 @@ def test_extreme_sheet_content_is_consistently_gated():
 
     active = [row for row in rows if row["review_status"] == "approved"]
     drafts = [row for row in rows if row["review_status"] == "draft"]
-    assert len(active) == 18
+    assert len(active) == 25
     assert all(row["external_id"].startswith("extreme_v2_") for row in active)
     assert all(row["is_enabled"] == "1" for row in active)
     assert {

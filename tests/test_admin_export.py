@@ -29,7 +29,7 @@ def test_cards_export_is_russian_editable_and_round_trips(tmp_path):
     assert [cell.value for cell in workbook["Флирт"][1]] == CARD_COLUMNS
     assert workbook["Флирт"].freeze_panes == "A2"
     assert workbook["Флирт"].data_validations.count >= 8
-    assert workbook["Экстрим"].max_row == 39
+    assert workbook["Экстрим"].max_row == 46
     assert workbook["Реквизит"]["B2"].value
     assert "check-in" not in " ".join(
         str(cell.value or "")
@@ -39,7 +39,7 @@ def test_cards_export_is_russian_editable_and_round_trips(tmp_path):
     )
 
     report = service.import_content(111, str(path), dry_run=True)
-    assert report.added_or_updated == 744
+    assert report.added_or_updated == 751
     assert report.items_added_or_updated == 36
     assert report.warnings_count == 0
     db.close()
