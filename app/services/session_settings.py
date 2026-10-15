@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from app.domain import ANAL_MODES, ANAL_TAGS
 from app.services.errors import GameError
 from app.storage import Database
 from app.storage.repositories.sessions import SessionRepository
@@ -188,6 +189,25 @@ class SessionSettingsMixin:
         )
         return selected
 
+    def anal_mode(self, chat_id: int, thread_id: int | None) -> str:
+        blocked = self.boundaries_for_active_session(chat_id, thread_id) & ANAL_TAGS
+        for mode, tags in ANAL_MODES.items():
+            if blocked == tags:
+                return mode
+        return "off" if "anal" in blocked else "both"
+
+    def set_anal_mode(self, chat_id: int, thread_id: int | None, mode: str, user_id: int | None = None) -> str:
+        if mode not in ANAL_MODES:
+            raise GameError("Неизвестный режим")
+        current = self.boundaries_for_active_session(chat_id, thread_id)
+        self.set_boundaries_for_active_session(
+            chat_id,
+            thread_id,
+            sorted((current - ANAL_TAGS) | ANAL_MODES[mode]),
+            user_id,
+        )
+        return mode
+
     def save_boundaries_draft(
         self,
         chat_id: int,
@@ -197,7 +217,9 @@ class SessionSettingsMixin:
         session = self.active_session(chat_id, thread_id)
         if not session:
             raise GameError("Нет активной сессии")
-        selected = self.boundaries_draft(chat_id, thread_id, user_id)
+        # The anal mode lives in the main menu; a boundaries draft must not reset it.
+        current_anal = self.boundaries_for_active_session(chat_id, thread_id) & ANAL_TAGS
+        selected = (self.boundaries_draft(chat_id, thread_id, user_id) - ANAL_TAGS) | current_anal
         session_id = int(session["id"])
         self.set_boundaries_for_active_session(
             chat_id,

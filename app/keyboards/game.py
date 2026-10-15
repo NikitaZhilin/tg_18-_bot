@@ -38,6 +38,14 @@ CATEGORY_HINTS = {
 }
 
 HOME = "🏠 Меню"
+
+ANAL_SHORT = {"both": "✅ обоим", "her": "👩 только ей", "him": "👨 только ему", "off": "🚫 выключен"}
+ANAL_CHOICES = {
+    "both": "✅ Обоим",
+    "her": "👩 Только для неё",
+    "him": "👨 Только для него",
+    "off": "🚫 Без анала",
+}
 BACK = "⬅️ Назад"
 
 
@@ -52,6 +60,7 @@ def main_menu(
     enabled_levels: tuple[int, ...] = (1, 2, 3, 4),
     show_admin: bool = False,
     saved_desires: int = 0,
+    anal_mode: str = "both",
 ) -> InlineKeyboardMarkup:
     rows = []
     if has_active_turn:
@@ -59,6 +68,7 @@ def main_menu(
     rows.append([_button("🎲 Случайная карточка", "game:roulette")])
     rows.append([_button("🃏 Выбрать уровень", "game:menu")])
     rows.append([_button("🎭 Правда или действие", "tod:menu")])
+    rows.append([_button(f"🍑 Анал: {ANAL_SHORT.get(anal_mode, ANAL_SHORT['both'])}", "anal:menu")])
     if restricted_enabled:
         rows.append([_button("🔞 Экстрим", "game:extreme")])
     desires_text = f"🎁 Желания ({saved_desires})" if saved_desires else "🎁 Желания"
@@ -78,6 +88,7 @@ def main_menu_for_status(status: Mapping[str, object], *, show_admin: bool = Fal
         enabled_levels=tuple(status.get("enabled_levels") or (1, 2, 3, 4)),
         show_admin=show_admin,
         saved_desires=int(status.get("saved_desires") or 0),
+        anal_mode=str(status.get("anal_mode") or "both"),
     )
 
 
@@ -308,3 +319,22 @@ def tod_choice_menu(level: int, intensity: str) -> InlineKeyboardMarkup:
             [_button("🔁 Сменить уровень", "tod:menu"), _button(HOME, "game:home")],
         ]
     )
+
+
+def anal_menu_text(mode: str) -> str:
+    return (
+        "🍑 Анал в этой игре\n\n"
+        f"Сейчас: {ANAL_CHOICES[mode]}\n\n"
+        "Задания, позы, желания и штрафы, где анал обязателен, будут выпадать только так, как выбрано. "
+        "Карточки «вагинально или анально» остаются — там выбираете сами.\n"
+        "Действует до конца игры."
+    )
+
+
+def anal_menu(mode: str) -> InlineKeyboardMarkup:
+    rows = [
+        [_button(("● " if code == mode else "") + label, f"anal:set:{code}")]
+        for code, label in ANAL_CHOICES.items()
+    ]
+    rows.append([_button(HOME, "game:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
