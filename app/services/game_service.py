@@ -775,9 +775,4 @@ def format_card(card: PickedCard) -> str:
         timer = f"\n\n⏱ {duration} — нажмите «Запустить таймер», бот напомнит."
     else:
         timer = ""
-    aftercare = (
-        "\n\n💛 После: обнимитесь, дайте друг другу воды и скажите, как было."
-        if card.aftercare_required
-        else ""
-    )
-    return f"{title}{heading}\n\n{card.text}{item}{timer}{aftercare}"
+    return f"{title}{heading}\n\n{card.text}{item}{timer}"

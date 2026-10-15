@@ -208,3 +208,11 @@ def test_menu_screens_explain_levels_intensity_and_categories():
     assert "🌿 Мягко" in intensity_menu_text(3) and "💥 Жёстко" in intensity_menu_text(3)
     text = category_menu_text(4, "hard", ["task", "pose"])
     assert "🎯 Задание" in text and "🛏 Поза" in text and "💬 Вопрос" not in text
+
+
+def test_cards_have_no_generic_aftercare_footer(tmp_path):
+    db, config, service, _ = _ready_game(tmp_path)
+    result = service.draw_card(CHAT, None, 111, level=4, category="task", intensity="hard")
+    from app.services.game_service import format_card
+
+    assert "💛" not in format_card(result.card)
