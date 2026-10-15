@@ -96,7 +96,8 @@ class Config:
 
     def runtime_warnings(self) -> list[str]:
         warnings: list[str] = []
-        expected = 1 if self.single_account_two_players else 2
+        # Private chats are always one phone for both; two ids also enable a shared group.
+        expected = 2
         if len(self.allowed_user_ids) > expected:
             ids = sorted(self.allowed_user_ids)
             warnings.append(

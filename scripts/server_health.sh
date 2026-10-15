@@ -81,10 +81,9 @@ c = Config.from_env()
 print("PLAYERS_MODE: %s" % ("single_account" if c.single_account_two_players else "two_accounts"))
 print("ALLOWED_USERS_COUNT: %s" % len(c.allowed_user_ids))
 print("ALLOW_UNLISTED_USERS: %s" % c.allow_unlisted_users)
-if c.single_account_two_players:
-    print("WARN: one Telegram account plays for both; a shared group needs two accounts")
-elif len(c.allowed_user_ids) != 2:
-    print("WARN: expected exactly two allowed accounts")
+print("GROUP_PLAY: %s" % ("ready" if len(c.allowed_user_ids) >= 2 else "needs a second allowed account"))
+if len(c.allowed_user_ids) > 2:
+    print("WARN: more than two allowed accounts")
 if c.telegram_proxy_url:
     print("BOT_GROUPS: unknown (proxy configured)")
 else:

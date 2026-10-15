@@ -82,3 +82,79 @@ def test_truth_or_dare_in_a_group_passes_the_choice_to_the_wife(tmp_path):
     _press(f"game:done:{turn_id}", HUSBAND, config, service, bot, game.cb_done)
     chat_id, text, _ = bot.sent[-1]
     assert chat_id == GROUP and "Ходит: B" in text
+
+
+# --- private chat stays a one-phone game; group guards ----------------------
+
+
+def test_private_chat_is_one_phone_for_both_even_with_two_accounts(tmp_path):
+    db, config, service, bot = _setup(tmp_path)
+    session = service.ensure_session(HUSBAND, None)
+    assert int(session["player_1_id"]) == int(session["player_2_id"]) == HUSBAND
+    first = service.draw_card(HUSBAND, None, HUSBAND, level=1, category="task")
+    assert service.finish_turn(HUSBAND, None, HUSBAND) == "B"
+    service.draw_card(HUSBAND, None, HUSBAND, level=1, category="task")  # the «second player» on the same phone
+    assert first.turn_id
+
+
+def test_wife_has_her_own_one_phone_game_in_her_private_chat(tmp_path):
+    db, config, service, bot = _setup(tmp_path)
+    session = service.ensure_session(WIFE, None)
+    assert int(session["player_1_id"]) == int(session["player_2_id"]) == WIFE
+
+
+def test_group_needs_two_accounts(tmp_path):
+    import pytest
+    from dataclasses import replace
+
+    from app.services.errors import GameError
+
+    db = migrated_db(tmp_path)
+    config = replace(make_config(tmp_path), allowed_user_ids={HUSBAND}, admin_user_ids={HUSBAND}, single_account_two_players=True)
+    service = GameService(db, config)
+    assert service.ensure_session(HUSBAND, None)  # private chat still works
+    session = service.ensure_session(GROUP, None)
+    assert int(session["player_1_id"]) == HUSBAND  # alone in a group: same as private
+
+
+class CrowdedBot(FakeBot):
+    def __init__(self, members):
+        super().__init__()
+        self.members = members
+        self.left = []
+
+    async def get_chat_member_count(self, chat_id):
+        return self.members
+
+    async def leave_chat(self, chat_id):
+        self.left.append(chat_id)
+
+
+def test_no_cards_in_a_group_with_a_third_person(tmp_path):
+    db, config, service, _ = _setup(tmp_path)
+    bot = CrowdedBot(members=4)
+    callback = _press("game:roulette", HUSBAND, config, service, bot, game.cb_roulette)
+    assert callback.answers and "кроме вас двоих" in callback.answers[0][0]
+    assert service.active_session(GROUP, None) is None
+
+
+def test_bot_leaves_a_group_added_by_a_stranger_and_greets_partners(tmp_path):
+    from app.handlers import membership
+
+    config = make_config(tmp_path)
+
+    def event(by, bot):
+        return SimpleNamespace(
+            chat=SimpleNamespace(id=GROUP, type="supergroup"),
+            new_chat_member=SimpleNamespace(status="member"),
+            from_user=SimpleNamespace(id=by),
+            bot=bot,
+        )
+
+    stranger_bot = CrowdedBot(members=3)
+    asyncio.run(membership.on_bot_membership(event(STRANGER, stranger_bot), config))
+    assert stranger_bot.left == [GROUP] and stranger_bot.sent == []
+
+    our_bot = CrowdedBot(members=3)
+    asyncio.run(membership.on_bot_membership(event(HUSBAND, our_bot), config))
+    assert our_bot.left == [] and "/start" in our_bot.sent[0][1]
