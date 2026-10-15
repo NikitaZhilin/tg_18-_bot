@@ -47,23 +47,30 @@ class SessionRepository:
         player_2_id: int,
         current_player_id: int,
         current_player_slot: str = "player_1",
+        player_3_id: int | None = None,
     ) -> int:
-        cur = self.db.execute(
-            """
-            INSERT INTO sessions (
-                chat_key, player_1_id, player_2_id, current_player_id,
-                current_player_slot, updated_at
+        if player_3_id is None:
+            cur = self.db.execute(
+                """
+                INSERT INTO sessions (
+                    chat_key, player_1_id, player_2_id, current_player_id,
+                    current_player_slot, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (chat_key, player_1_id, player_2_id, current_player_id, current_player_slot),
             )
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """,
-            (
-                chat_key,
-                player_1_id,
-                player_2_id,
-                current_player_id,
-                current_player_slot,
-            ),
-        )
+        else:
+            cur = self.db.execute(
+                """
+                INSERT INTO sessions (
+                    chat_key, player_1_id, player_2_id, player_3_id, play_mode,
+                    current_player_id, current_player_slot, updated_at
+                )
+                VALUES (?, ?, ?, ?, 'threesome', ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (chat_key, player_1_id, player_2_id, player_3_id, current_player_id, current_player_slot),
+            )
         session_id = int(cur.lastrowid)
         self.db.executemany(
             "INSERT OR IGNORE INTO session_enabled_levels (session_id, level) VALUES (?, ?)",

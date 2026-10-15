@@ -10,6 +10,7 @@ from app.domain import PickFilter, PickedCard
 from app.labels import CATEGORY_NAMES, INTENSITY_NAMES, LEVEL_NAMES
 from app.services.card_picker import CardPicker, NoCardsAvailable
 from app.services.errors import GameError
+from app.services.threesome import ThreesomeSettings
 from app.services.session_settings import SessionSettingsMixin
 from app.storage import Database
 from app.storage.repositories.cards import CardRepository
@@ -35,6 +36,7 @@ class GameService(SessionSettingsMixin):
         self.users = UserRepository(db)
         self.cards = CardRepository(db)
         self.card_picker = CardPicker(db)
+        self.threesome = ThreesomeSettings(db)
 
     def _consent_date(self) -> str:
         return datetime.now(ZoneInfo(self.config.bot_timezone)).date().isoformat()
@@ -56,7 +58,20 @@ class GameService(SessionSettingsMixin):
                 )
 
     def _player_label(self, slot: str) -> str:
+        if slot == "player_3":
+            return self.threesome.state().third_name
         return self.config.player_2_name if slot == "player_2" else self.config.player_1_name
+
+    @staticmethod
+    def _next_slot(session) -> str:
+        current = session["current_player_slot"] or "player_1"
+        three = _has_third(session)
+        order = ["player_1", "player_2", "player_3"] if three else ["player_1", "player_2"]
+        return order[(order.index(current) + 1) % len(order)] if current in order else "player_1"
+
+    @staticmethod
+    def _is_threesome(session) -> bool:
+        return _has_third(session)
 
     def register_allowed_users(self) -> None:
         ids = sorted(self.config.allowed_user_ids)
@@ -73,16 +88,31 @@ class GameService(SessionSettingsMixin):
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         self.sessions.ensure_chat_context(chat_key, chat_id, thread_id, title)
         active = self.sessions.get_active(chat_key)
+        three = self.threesome.state() if chat_id < 0 else None
+        wants_third = bool(three and three.active)
+        if active and _has_third(active) != wants_third:
+            # The admin switched «игра на троих» on or off: start this group's game anew.
+            self.db.execute(
+                "UPDATE sessions SET status = 'completed', stop_reason = 'mode_changed', "
+                "stopped_at = CURRENT_TIMESTAMP, active_turn_id = NULL WHERE id = ?",
+                (active["id"],),
+            )
+            active = None
         if active:
             self._restore_daily_consents(active)
             return active
         player_1_id, player_2_id = self._players_for_chat(chat_id)
+        player_3_id = None
+        if wants_third:
+            player_3_id = three.third_id
+            self.users.upsert_user(player_3_id, three.third_name, "player_3")
         session_id = self.sessions.create(
             chat_key,
             player_1_id,
             player_2_id,
             player_1_id,
             "player_1",
+            player_3_id=player_3_id,
         )
         session = self.db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
         self._restore_daily_consents(session)
@@ -221,6 +251,7 @@ class GameService(SessionSettingsMixin):
                     intensity=intensity,
                     collection_code=collection_code,
                     allow_restricted_content=bool(session["allow_restricted_content"]),
+                    threesome=_has_third(session),
                 ),
                 conn,
             )
@@ -333,7 +364,7 @@ class GameService(SessionSettingsMixin):
             if not turn:
                 raise GameError("Активной карточки нет")
             if int(turn["player_id"]) != int(user_id):
-                raise GameError("Сейчас ход другого игрока")
+                raise GameError("Сейчас очередь другого игрока")
             if revision_turn_id is not None and int(turn["id"]) != int(revision_turn_id):
                 raise GameError("Эта карточка уже обработана")
             level = turn["selected_level"]
@@ -356,6 +387,7 @@ class GameService(SessionSettingsMixin):
                         intensity=intensity,
                         collection_code=collection_code,
                         allow_restricted_content=bool(session["allow_restricted_content"]),
+                        threesome=_has_third(session),
                     ),
                     conn,
                 )
@@ -561,6 +593,7 @@ class GameService(SessionSettingsMixin):
                             session_id=int(session["id"]),
                             category="penalty",
                             allow_restricted_content=False,
+                            threesome=_has_third(session),
                             **filters,
                         ),
                         conn,
@@ -569,9 +602,8 @@ class GameService(SessionSettingsMixin):
                 except NoCardsAvailable:
                     continue
             if penalty is None:
-                current_slot = session["current_player_slot"] or "player_1"
-                next_slot = "player_2" if current_slot == "player_1" else "player_1"
-                next_player = session["player_2_id"] if next_slot == "player_2" else session["player_1_id"]
+                next_slot = self._next_slot(session)
+                next_player = session[f"{next_slot}_id"]
                 conn.execute(
                     "UPDATE sessions SET active_turn_id = NULL, current_player_id = ?, current_player_slot = ?, "
                     "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -631,7 +663,7 @@ class GameService(SessionSettingsMixin):
             if not turn or turn["status"] != "active":
                 raise GameError("Карточка уже завершена")
             if int(turn["player_id"]) != int(user_id):
-                raise GameError("Сейчас ход другого игрока")
+                raise GameError("Сейчас очередь другого игрока")
             conn.execute(
                 "UPDATE turns SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (status, active_turn_id),
@@ -644,9 +676,8 @@ class GameService(SessionSettingsMixin):
                 """,
                 (active_turn_id,),
             )
-            current_slot = session["current_player_slot"] or "player_1"
-            next_slot = "player_2" if current_slot == "player_1" else "player_1"
-            next_player = session["player_2_id"] if next_slot == "player_2" else session["player_1_id"]
+            next_slot = self._next_slot(session)
+            next_player = session[f"{next_slot}_id"]
             conn.execute(
                 """
                 UPDATE sessions
@@ -727,6 +758,7 @@ class GameService(SessionSettingsMixin):
             "has_active_turn": bool(session["active_turn_id"]),
             "active_turn_id": session["active_turn_id"],
             "anal_mode": self.anal_mode(chat_id, thread_id),
+            "threesome": _has_third(session),
             "saved_desires": int(
                 self.db.fetchone(
                     "SELECT COUNT(*) AS count FROM saved_desires WHERE session_id = ? AND status = 'saved'",
@@ -735,7 +767,7 @@ class GameService(SessionSettingsMixin):
             ),
         }
 
-    def categories_with_cards(self, level: int, intensity: str) -> list[str]:
+    def categories_with_cards(self, level: int, intensity: str, threesome: bool = False) -> list[str]:
         """Categories that have at least one playable card, so the menu shows no dead buttons."""
         rows = self.db.fetchall(
             """
@@ -752,8 +784,12 @@ class GameService(SessionSettingsMixin):
                   WHERE restricted.card_id = c.id
                     AND restricted.collection_code = 'restricted_content'
               )
+              AND (EXISTS (
+                  SELECT 1 FROM card_collection_items t
+                  WHERE t.card_id = c.id AND t.collection_code = 'threesome'
+              )) = ?
             """,
-            (level, intensity),
+            (level, intensity, 1 if threesome else 0),
         )
         return [str(row["category"]) for row in rows]
 
@@ -787,3 +823,10 @@ def format_card(card: PickedCard) -> str:
     else:
         timer = ""
     return f"{title}{heading}\n\n{card.text}{item}{timer}"
+
+
+def _has_third(session) -> bool:
+    try:
+        return session["player_3_id"] is not None
+    except (IndexError, KeyError):
+        return False

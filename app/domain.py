@@ -62,6 +62,7 @@ class PickFilter:
     collection_code: str | None = None
     allow_restricted_content: bool = False
     allow_repeats: bool = False
+    threesome: bool = False
 
 
 @dataclass(frozen=True)

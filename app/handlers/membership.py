@@ -7,7 +7,7 @@ from aiogram.enums import ChatType
 from aiogram.types import ChatMemberUpdated
 
 from app.config import Config
-from app.handlers.common import MAX_GROUP_MEMBERS
+from app.handlers.common import max_group_members
 
 router = Router(name="membership")
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ async def on_bot_membership(event: ChatMemberUpdated, config: Config) -> None:
         return
     text = GROUP_HELLO
     try:
-        if await event.bot.get_chat_member_count(event.chat.id) > MAX_GROUP_MEMBERS:
+        if await event.bot.get_chat_member_count(event.chat.id) > max_group_members():
             text = "Здесь больше двух человек — в такой группе я не играю. Создайте группу только на вас двоих."
     except Exception:
         pass
