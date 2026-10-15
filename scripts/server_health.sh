@@ -121,6 +121,7 @@ print("HEARTBEAT_AGE_SECONDS: %s" % age)
 if not isinstance(age, int) or age > 120:
     print("WARN: heartbeat is stale or missing")
 print("MIGRATION: %s" % one("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1"))
+print("SQLITE_VERSION: %s" % sqlite3.sqlite_version)
 print("DB_INTEGRITY: %s" % one("PRAGMA quick_check"))
 failed = one("SELECT COUNT(*) FROM timers WHERE status = 'expired' AND started_at >= datetime('now', '-7 days')")
 stuck = one("SELECT COUNT(*) FROM timers WHERE status = 'active' AND deadline_at < strftime('%Y-%m-%dT%H:%M:%S', 'now', '-10 minutes')")
