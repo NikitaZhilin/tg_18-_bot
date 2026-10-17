@@ -130,9 +130,50 @@ class GameService(SessionSettingsMixin):
             "player_1",
             player_3_id=player_3_id,
         )
+        self._carry_over_from_previous(chat_key, session_id)
         session = self.db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
         self._restore_daily_consents(session)
         return session
+
+    def _carry_over_from_previous(self, chat_key: str, session_id: int) -> None:
+        """A new game keeps the last game's levels, toys, boundaries, «Анал», «Экстрим» and coupons."""
+        prev = self.db.fetchone(
+            "SELECT * FROM sessions WHERE chat_key = ? AND id < ? ORDER BY id DESC LIMIT 1",
+            (chat_key, session_id),
+        )
+        if not prev:
+            return
+        new = self.db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
+        prev_id = int(prev["id"])
+        with self.db.transaction() as conn:
+            levels = [r["level"] for r in conn.execute("SELECT level FROM session_enabled_levels WHERE session_id = ?", (prev_id,))]
+            if levels:
+                conn.execute("DELETE FROM session_enabled_levels WHERE session_id = ?", (session_id,))
+                conn.executemany(
+                    "INSERT OR IGNORE INTO session_enabled_levels (session_id, level) VALUES (?, ?)",
+                    [(session_id, level) for level in levels],
+                )
+            items = conn.execute("SELECT item_code, frequency FROM session_items WHERE session_id = ?", (prev_id,)).fetchall()
+            if items:
+                conn.execute("DELETE FROM session_items WHERE session_id = ?", (session_id,))
+                conn.executemany(
+                    "INSERT OR IGNORE INTO session_items (session_id, item_code, frequency) VALUES (?, ?, ?)",
+                    [(session_id, r["item_code"], r["frequency"]) for r in items],
+                )
+            conn.execute(
+                "INSERT OR IGNORE INTO session_blocked_tags (session_id, risk_tag) "
+                "SELECT ?, risk_tag FROM session_blocked_tags WHERE session_id = ?",
+                (session_id, prev_id),
+            )
+            conn.execute(
+                "UPDATE sessions SET allow_restricted_content = ? WHERE id = ?",
+                (int(prev["allow_restricted_content"]), session_id),
+            )
+            if _session_players(prev) == _session_players(new):
+                conn.execute(
+                    "UPDATE saved_desires SET session_id = ? WHERE session_id = ? AND status = 'saved'",
+                    (session_id, prev_id),
+                )
 
     def _players_for_chat(self, chat_id: int) -> tuple[int, int]:
         """Who plays in this chat.
@@ -219,6 +260,7 @@ class GameService(SessionSettingsMixin):
         source: str = "manual",
         collection_code: str | None = None,
         play_mode: str | None = None,
+        card_id: int | None = None,
     ) -> DrawResult:
         chat_key = self.sessions.chat_key(chat_id, thread_id)
         with self.db.transaction() as conn:
@@ -258,19 +300,22 @@ class GameService(SessionSettingsMixin):
                     raise GameError("В настройке уровней по умолчанию не осталось доступных разделов")
                 levels = tuple(selected_levels)
 
-            card = self.card_picker.pick(
-                PickFilter(
-                    session_id=int(session["id"]),
-                    level=level,
-                    levels=levels,
-                    category=category,
-                    intensity=intensity,
-                    collection_code=collection_code,
-                    allow_restricted_content=bool(session["allow_restricted_content"]),
-                    threesome=_has_third(session),
-                ),
-                conn,
-            )
+            if card_id is not None:
+                card = self._favorite_card(conn, session, card_id)
+            else:
+                card = self.card_picker.pick(
+                    PickFilter(
+                        session_id=int(session["id"]),
+                        level=level,
+                        levels=levels,
+                        category=category,
+                        intensity=intensity,
+                        collection_code=collection_code,
+                        allow_restricted_content=bool(session["allow_restricted_content"]),
+                        threesome=_has_third(session),
+                    ),
+                    conn,
+                )
             cur = conn.execute(
                 """
                 INSERT INTO turns (
@@ -298,7 +343,7 @@ class GameService(SessionSettingsMixin):
             turn_id = int(cur.lastrowid)
             conn.execute(
                 """
-                INSERT INTO used_cards (session_id, card_id, turn_id, used_by)
+                INSERT OR IGNORE INTO used_cards (session_id, card_id, turn_id, used_by)
                 VALUES (?, ?, ?, ?)
                 """,
                 (session["id"], card.id, turn_id, user_id),
@@ -324,6 +369,96 @@ class GameService(SessionSettingsMixin):
                 (turn_id, session["id"]),
             )
         return DrawResult(turn_id, card, play_mode)
+
+    def _favorite_card(self, conn, session, card_id: int) -> PickedCard:
+        row = conn.execute(
+            "SELECT * FROM cards WHERE id = ? AND is_enabled = 1 AND deleted_at IS NULL",
+            (card_id,),
+        ).fetchone()
+        if not row:
+            raise GameError("Эта карточка больше не в игре.")
+        collections = {
+            r["collection_code"]
+            for r in conn.execute("SELECT collection_code FROM card_collection_items WHERE card_id = ?", (card_id,))
+        }
+        if ("threesome" in collections) != _has_third(session):
+            raise GameError("Эта карточка из другой колоды.")
+        if "restricted_content" in collections and not bool(session["allow_restricted_content"]):
+            raise GameError("Это карточка Экстрима — сначала включите «🔞 Экстрим».")
+        return self.card_picker._row_to_card(
+            row,
+            int(session["id"]),
+            conn,
+            collection_code="restricted_content" if "restricted_content" in collections else None,
+        )
+
+    def admin_counts(self) -> dict[str, int]:
+        def count(sql: str) -> int:
+            try:
+                return int(self.db.fetchone(sql)[0])
+            except Exception:
+                return 0
+        return {
+            "revision": count("SELECT COUNT(*) FROM cards WHERE review_status = 'needs_review' AND deleted_at IS NULL"),
+            "feedback": count("SELECT COUNT(*) FROM card_feedback WHERE status = 'new'"),
+            "conflicts": count("SELECT COUNT(*) FROM seed_conflicts WHERE status = 'pending'"),
+        }
+
+    # --- ⭐ favorites -----------------------------------------------------
+    def toggle_favorite(self, chat_id: int, thread_id: int | None, turn_id: int) -> bool:
+        chat_key = self.sessions.chat_key(chat_id, thread_id)
+        row = self.db.fetchone("SELECT card_id FROM turns WHERE id = ?", (turn_id,))
+        if not row:
+            raise GameError("Карточка не найдена")
+        exists = self.db.fetchone(
+            "SELECT 1 FROM favorite_cards WHERE chat_key = ? AND card_id = ?", (chat_key, row["card_id"])
+        )
+        if exists:
+            self.db.execute("DELETE FROM favorite_cards WHERE chat_key = ? AND card_id = ?", (chat_key, row["card_id"]))
+            return False
+        self.db.execute("INSERT INTO favorite_cards (chat_key, card_id) VALUES (?, ?)", (chat_key, row["card_id"]))
+        return True
+
+    def favorites(self, chat_id: int, thread_id: int | None) -> list[sqlite3.Row]:
+        chat_key = self.sessions.chat_key(chat_id, thread_id)
+        return self.db.fetchall(
+            """
+            SELECT c.id, c.title, c.level, c.category
+            FROM favorite_cards f JOIN cards c ON c.id = f.card_id
+            WHERE f.chat_key = ? AND c.is_enabled = 1 AND c.deleted_at IS NULL
+            ORDER BY f.created_at DESC
+            """,
+            (chat_key,),
+        )
+
+    # --- end of the evening -----------------------------------------------
+    def session_summary(self, session_id: int) -> str:
+        rows = self.db.fetchall(
+            """
+            SELECT t.status, t.source, t.play_mode, c.level, c.category
+            FROM turns t JOIN cards c ON c.id = t.card_id
+            WHERE t.session_id = ?
+            """,
+            (session_id,),
+        )
+        if not rows:
+            return ""
+        done = [r for r in rows if r["status"] == "completed" and r["source"] != "penalty"]
+        refused = sum(1 for r in rows if r["status"] == "skipped")
+        penalties = sum(1 for r in rows if r["source"] == "penalty" and r["status"] == "completed")
+        tod = sum(1 for r in done if (r["play_mode"] or "").startswith("tod"))
+        by_level: dict[int, int] = {}
+        for r in done:
+            by_level[int(r["level"])] = by_level.get(int(r["level"]), 0) + 1
+        names = {1: "Флирт", 2: "Разогрев", 3: "Секс", 4: "БДСМ"}
+        lines = [f"🏁 Итог вечера: карточек сыграно — {len(done)}."]
+        if by_level:
+            lines.append("По уровням: " + ", ".join(f"{names[l]} — {n}" for l, n in sorted(by_level.items())) + ".")
+        if tod:
+            lines.append(f"Из них в «Правде или действии» — {tod}.")
+        if refused:
+            lines.append(f"Отказов — {refused}, штрафов выполнено — {penalties}.")
+        return "\n".join(lines)
 
     def replace_active_card(
         self,
@@ -780,6 +915,7 @@ class GameService(SessionSettingsMixin):
             "active_timer": timer["deadline_at"] if timer else None,
             "restricted_content": bool(session["allow_restricted_content"]) and not _has_third(session),
             "extreme_switch": not _has_third(session),
+            "favorites": len(self.favorites(chat_id, thread_id)),
             "enabled_levels": self.sessions.enabled_levels(int(session["id"])),
             "has_active_turn": bool(session["active_turn_id"]),
             "active_turn_id": session["active_turn_id"],

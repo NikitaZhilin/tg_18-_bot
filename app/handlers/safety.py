@@ -22,11 +22,11 @@ router = Router(name="safety")
 
 
 STOPWORD_TEXT = "Игра остановлена. Сделайте паузу и обсудите, все ли в порядке."
-END_GAME_TEXT = "Игра завершена. Сегодня повторное подтверждение согласия не потребуется."
+END_GAME_TEXT = "Игра завершена. Настройки и неиспользованные желания перейдут в следующую игру."
 END_GAME_QUESTION = (
     "Завершить игру?\n\n"
-    "Незавершённая карточка закроется, следующая игра начнётся заново. "
-    "Подтверждать согласие сегодня повторно не нужно."
+    "Незавершённая карточка закроется. Настройки, избранное и неиспользованные желания "
+    "сохранятся для следующей игры."
 )
 
 
@@ -94,7 +94,9 @@ async def cb_end_game(
         await answer_callback(callback)
         return
     chat_id, thread_id = callback.message.chat.id, callback_thread_id(callback)
+    session = game_service.active_session(chat_id, thread_id)
     safety_service.end_game(chat_id, thread_id, callback.from_user.id)
+    summary = game_service.session_summary(int(session["id"])) if session else ""
     _, markup = home(game_service, config, chat_id, thread_id, callback.from_user.id)
-    await show_screen(callback, END_GAME_TEXT, markup)
+    await show_screen(callback, f"{summary}\n\n{END_GAME_TEXT}" if summary else END_GAME_TEXT, markup)
     await answer_callback(callback)

@@ -19,6 +19,7 @@ from app.keyboards.game import (
     level_menu_text,
     settings_menu,
     settings_menu_text,
+    favorites_menu,
     tod_choice_menu,
     tod_choice_text,
     tod_intensity_menu,
@@ -626,3 +627,39 @@ async def cb_tod_draw(callback: CallbackQuery, config: Config, game_service: Gam
         game_service,
         truth_or_dare=dict(level=int(level), intensity=intensity, category=category),
     )
+
+
+# ---- ⭐ Избранное ----
+
+@router.callback_query(F.data.startswith("game:fav:"))
+async def cb_favorite(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    turn_id = int(callback.data.split(":")[-1])
+    try:
+        added = game_service.toggle_favorite(*_where(callback), turn_id)
+    except GameError as exc:
+        await answer_callback(callback, str(exc), show_alert=True)
+        return
+    await answer_callback(callback, "⭐ В избранном" if added else "Убрано из избранного")
+
+
+@router.callback_query(F.data.startswith("game:favs:"))
+async def cb_favorites(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    rows = game_service.favorites(*_where(callback))
+    if not rows:
+        await answer_callback(callback, "В избранном пока пусто. Нажмите «⭐ В избранное» на понравившейся карточке.", show_alert=True)
+        return
+    page = int(callback.data.split(":")[-1])
+    await show_screen(callback, "⭐ Избранное — нажмите, чтобы сыграть карточку ещё раз.", favorites_menu(rows, page))
+    await answer_callback(callback)
+
+
+@router.callback_query(F.data.startswith("game:favplay:"))
+async def cb_favorite_play(callback: CallbackQuery, config: Config, game_service: GameService) -> None:
+    if await reject_callback_if_not_allowed(callback, config):
+        return
+    card_id = int(callback.data.split(":")[-1])
+    await _draw(callback, game_service, level=None, category=None, card_id=card_id)
