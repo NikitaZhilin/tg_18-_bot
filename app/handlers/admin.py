@@ -30,8 +30,7 @@ router = Router(name="admin")
 
 
 def _admin_menu(game_service: GameService, chat_id: int, thread_id: int | None):
-    status = game_service.status(chat_id, thread_id)
-    return admin_menu(restricted_enabled=bool(status.get("restricted_content", False)))
+    return admin_menu(counts=game_service.admin_counts())
 
 
 @router.message(Command("admin"))

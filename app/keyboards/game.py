@@ -62,6 +62,7 @@ def main_menu(
     saved_desires: int = 0,
     anal_mode: str = "both",
     extreme_switch: bool = True,
+    favorites: int = 0,
 ) -> InlineKeyboardMarkup:
     rows = []
     if has_active_turn:
@@ -74,7 +75,9 @@ def main_menu(
         switch = _button("🔞 Экстрим: ✅ вкл" if restricted_enabled else "🔞 Экстрим: 🚫 выкл", "game:extreme_toggle")
         rows.append([switch, _button("🔞 Экстрим", "game:extreme")] if restricted_enabled else [switch])
     desires_text = f"🎁 Желания ({saved_desires})" if saved_desires else "🎁 Желания"
-    rows.append([_button(desires_text, "game:desires:0"), _button(SETTINGS_BUTTON, "game:settings")])
+    favorites_text = f"⭐ Избранное ({favorites})" if favorites else "⭐ Избранное"
+    rows.append([_button(desires_text, "game:desires:0"), _button(favorites_text, "game:favs:0")])
+    rows.append([_button(SETTINGS_BUTTON, "game:settings")])
     if show_admin:
         rows.append([_button("🛠 Админка", "admin:menu")])
     rows.append([_button("⏹ Закончить игру", "safe:end_game")])
@@ -92,6 +95,7 @@ def main_menu_for_status(status: Mapping[str, object], *, show_admin: bool = Fal
         saved_desires=int(status.get("saved_desires") or 0),
         anal_mode=str(status.get("anal_mode") or "both"),
         extreme_switch=bool(status.get("extreme_switch", True)),
+        favorites=int(status.get("favorites") or 0),
     )
 
 
@@ -222,7 +226,7 @@ def card_actions(turn_id: int, has_timer: bool, *, is_penalty: bool = False) -> 
         rows.extend(
             [
                 [_button("✅ Сделали", f"game:done:{turn_id}"), _button("🙅 Отказ → штраф", f"game:refuse:{turn_id}")],
-                [_button("🚫 Убрать карточку навсегда", f"game:revision:{turn_id}")],
+                [_button("🚫 Убрать навсегда", f"game:revision:{turn_id}"), _button("⭐ В избранное", f"game:fav:{turn_id}")],
             ]
         )
     rows.append([_button(HOME, "game:home"), _button("⏹ Закончить", "safe:end_game")])
@@ -341,3 +345,26 @@ def anal_menu(mode: str) -> InlineKeyboardMarkup:
     ]
     rows.append([_button(HOME, "game:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+FAVORITES_PAGE = 8
+
+
+def favorites_menu(rows, page: int = 0) -> InlineKeyboardMarkup:
+    from app.labels import CATEGORY_NAMES
+
+    start = page * FAVORITES_PAGE
+    chunk = rows[start:start + FAVORITES_PAGE]
+    buttons = [
+        [_button(f"{LEVEL_ICONS.get(int(r['level']), '')} {r['title']} · {CATEGORY_NAMES.get(r['category'], '')}", f"game:favplay:{r['id']}")]
+        for r in chunk
+    ]
+    nav = []
+    if page > 0:
+        nav.append(_button("⬅️", f"game:favs:{page - 1}"))
+    if start + FAVORITES_PAGE < len(rows):
+        nav.append(_button("➡️", f"game:favs:{page + 1}"))
+    if nav:
+        buttons.append(nav)
+    buttons.append([_button(HOME, "game:home")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

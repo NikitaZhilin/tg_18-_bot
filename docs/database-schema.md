@@ -15,7 +15,7 @@
 | Реквизит | `items` (`default_owned`, `usage_text`), `card_required_items`, `session_items` |
 | Границы и безопасность | `session_blocked_tags` (границы и режим «🍑 Анал»), `safety_events`, `session_consents`, `daily_slot_consents` |
 | Таймеры | `timers` |
-| Желания | `saved_desires` |
+| Желания и избранное | `saved_desires` (неиспользованные переходят в следующую игру), `favorite_cards` |
 | Админка | `admin_actions`, `card_versions`, `seed_conflicts`, `card_feedback`, `card_review_progress` |
 | Временное состояние | `fsm_states`, `session_setting_drafts` |
 | Эксплуатация | `content_imports`, `app_heartbeats`, `schema_migrations` |
@@ -30,6 +30,7 @@
 | 021–023 | Описания игрушек сокращены |
 | 024 | Игра на троих: `player_3`, `play_mode`, `bot_settings`, коллекция `threesome`; слоты пересозданы с `player_3` |
 | 025 | Описания игрушек убраны; `unlocked_groups`, `group_players`; Экстрим включён в открытых играх |
+| 026 | `favorite_cards` — «⭐ Избранное» чата |
 
 Миграция 024 удаляет колонки (`ALTER TABLE … DROP COLUMN`) — нужна SQLite 3.35+, на сервере 3.45.
 

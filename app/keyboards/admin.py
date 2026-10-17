@@ -15,7 +15,12 @@ from app.labels import (
 )
 
 
-def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarkup:
+def _counted(text: str, count: int) -> str:
+    return f"{text} ({count})" if count else text
+
+
+def admin_menu(*, restricted_enabled: bool | None = None, counts: dict[str, int] | None = None) -> InlineKeyboardMarkup:
+    counts = counts or {}
     restricted_text = "Доступ к «Экстриму»"
     if restricted_enabled is not None:
         restricted_text = f"Экстрим: {'доступ открыт' if restricted_enabled else 'доступ закрыт'}"
@@ -23,11 +28,11 @@ def admin_menu(*, restricted_enabled: bool | None = None) -> InlineKeyboardMarku
         inline_keyboard=[
             [InlineKeyboardButton(text="Добавить карточку", callback_data="admin:add")],
             [InlineKeyboardButton(text="Проверка карточек", callback_data="admin:review")],
-            [InlineKeyboardButton(text="Карточки на доработке", callback_data="admin:revision_queue:0")],
+            [InlineKeyboardButton(text=_counted("Карточки на доработке", counts.get("revision", 0)), callback_data="admin:revision_queue:0")],
             [InlineKeyboardButton(text="Каталог карточек", callback_data="admin:catalog")],
             [InlineKeyboardButton(text="Каталог реквизита", callback_data="admin:items:0")],
-            [InlineKeyboardButton(text="Сообщения игроков", callback_data="admin:feedback")],
-            [InlineKeyboardButton(text="Конфликты обновлений", callback_data="admin:conflicts")],
+            [InlineKeyboardButton(text=_counted("Сообщения игроков", counts.get("feedback", 0)), callback_data="admin:feedback")],
+            [InlineKeyboardButton(text=_counted("Конфликты обновлений", counts.get("conflicts", 0)), callback_data="admin:conflicts")],
             [InlineKeyboardButton(text="Импорт XLSX", callback_data="admin:import")],
             [InlineKeyboardButton(text="Экспорт XLSX", callback_data="admin:export")],
             [InlineKeyboardButton(text="🔑 Пароль для групп", callback_data="grp:password")],
