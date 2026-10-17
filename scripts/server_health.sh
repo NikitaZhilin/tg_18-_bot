@@ -81,7 +81,6 @@ c = Config.from_env()
 print("PLAYERS_MODE: %s" % ("single_account" if c.single_account_two_players else "two_accounts"))
 print("ALLOWED_USERS_COUNT: %s" % len(c.allowed_user_ids))
 print("ALLOW_UNLISTED_USERS: %s" % c.allow_unlisted_users)
-print("GROUP_PLAY: %s" % ("ready" if len(c.allowed_user_ids) >= 2 else "needs a second allowed account"))
 if len(c.allowed_user_ids) > 2:
     print("WARN: more than two allowed accounts")
 if c.telegram_proxy_url:
@@ -132,6 +131,9 @@ if isinstance(stuck, int) and stuck:
     print("WARN: %s timers are overdue and not delivered" % stuck)
 print("CHATS_PRIVATE: %s" % one("SELECT COUNT(*) FROM chat_contexts WHERE telegram_chat_id > 0"))
 print("CHATS_GROUP: %s" % one("SELECT COUNT(*) FROM chat_contexts WHERE telegram_chat_id < 0"))
+print("GROUP_PASSWORD: %s" % ("set" if one("SELECT COUNT(*) FROM bot_settings WHERE key = 'group_password' AND value IS NOT NULL") else "not set"))
+print("GROUPS_UNLOCKED: %s" % one("SELECT COUNT(*) FROM unlocked_groups"))
+print("THREESOME_MODE: %s" % ("on" if one("SELECT value FROM bot_settings WHERE key = 'threesome_enabled'") == "1" else "off"))
 print("OPEN_GAMES_ONE_ACCOUNT: %s" % one("SELECT COUNT(*) FROM sessions WHERE status IN ('draft','active') AND player_1_id = player_2_id"))
 open_reports = one("SELECT COUNT(*) FROM card_feedback WHERE status = 'new'")
 print("UNCLEAR_CARD_REPORTS_OPEN: %s" % open_reports)
